@@ -1,7 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.contextos.app">
+    package="com.contextos.app"
+>
 
     <!-- ─── Networking ─────────────────────────── -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -24,20 +26,28 @@
 
     <!-- ─── Notifications ────────────────────────── -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission
+        android:name="android.permission.ACCESS_NOTIFICATION_POLICY"
+    />
 
     <!-- ─── Foreground service ───────────────────── -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"
+    />
 
     <!-- ─── Boot + Battery ───────────────────────── -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission
+        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+    />
 
     <!-- ─── Alarms ───────────────────────────────── -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
-        tools:ignore="ExactAlarm" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        tools:ignore="ExactAlarm"
+    />
 
     <application
         android:name=".ContextOSApplication"
@@ -49,7 +59,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ContextOS"
-        tools:targetApi="31">
+        tools:targetApi="31"
+    >
 
         <!-- ─── Main entry point ──────────────────── -->
         <activity
@@ -57,12 +68,19 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.ContextOS"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+        >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- ─── Google Maps API key ─────────────── -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}"
+        />
 
         <!-- ─── Boot receiver placeholder ────────── -->
         <!--

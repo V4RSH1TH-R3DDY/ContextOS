@@ -50,6 +50,8 @@ captures/
 
 # Google Services (e.g. APIs or Firebase)
 google-services.json
+client_secret*.json
+*.apps.googleusercontent.com.json
 
 # Fastlane
 fastlane/report.xml

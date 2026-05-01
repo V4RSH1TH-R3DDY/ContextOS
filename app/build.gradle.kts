@@ -1,3 +1,10 @@
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) load(file.inputStream())
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -20,6 +27,15 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // Maps API key — read from local.properties, never hardcoded
+        buildConfigField(
+            "String",
+            "MAPS_API_KEY",
+            "\"${localProperties["MAPS_API_KEY"] ?: ""}\""
+        )
+        // Also expose to AndroidManifest for the Maps SDK meta-data tag
+        manifestPlaceholders["MAPS_API_KEY"] = localProperties["MAPS_API_KEY"] ?: ""
     }
 
     buildTypes {
