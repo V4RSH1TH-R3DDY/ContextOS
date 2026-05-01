@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">ContextOS</string>
+    <string name="starting_message">ContextOS is starting…</string>
+
+    <!-- Notification channels -->
+    <string name="notification_channel_id_assistant">contextos_assistant</string>
+    <string name="notification_channel_name_assistant">Assistant</string>
+    <string name="notification_channel_desc_assistant">Notifications from the ContextOS AI assistant, including task reminders and proactive suggestions.</string>
+
+    <string name="notification_channel_id_sync">contextos_sync</string>
+    <string name="notification_channel_name_sync">Background Sync</string>
+    <string name="notification_channel_desc_sync">Silent background sync notifications for calendar, email, and drive data.</string>
+
+    <string name="notification_channel_id_service">contextos_service</string>
+    <string name="notification_channel_name_service">Foreground Service</string>
+    <string name="notification_channel_desc_service">Ongoing foreground service notification that keeps ContextOS active in the background.</string>
+
+    <!-- Permissions rationale -->
+    <string name="permission_rationale_location">ContextOS uses your location to surface context-aware suggestions and set location-based reminders.</string>
+    <string name="permission_rationale_microphone">ContextOS uses the microphone for voice input so you can dictate tasks and commands hands-free.</string>
+    <string name="permission_rationale_notifications">Allow notifications so ContextOS can alert you to important events and reminders.</string>
+    <string name="permission_rationale_calendar">ContextOS reads your calendar to help plan your day and avoid scheduling conflicts.</string>
+    <string name="permission_rationale_sms">ContextOS reads SMS messages to give you a unified view of your conversations and follow-ups.</string>
+
+    <!-- Generic UI -->
+    <string name="label_ok">OK</string>
+    <string name="label_cancel">Cancel</string>
+    <string name="label_retry">Retry</string>
+    <string name="label_dismiss">Dismiss</string>
+    <string name="label_settings">Settings</string>
+    <string name="error_generic">Something went wrong. Please try again.</string>
+</resources>

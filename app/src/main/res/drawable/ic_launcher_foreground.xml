@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder launcher foreground icon for ContextOS. Replace with final artwork. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- "C" letterform in white on transparent background -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,20 C35.2,20 20,35.2 20,54 C20,72.8 35.2,88 54,88
+                          C65.5,88 75.7,82.4 82.2,73.7 L71.5,67.1
+                          C67.2,72.5 60.9,76 54,76 C41.8,76 32,66.3 32,54
+                          C32,41.8 41.8,32 54,32 C60.9,32 67.2,35.5 71.5,40.9
+                          L82.2,34.3 C75.7,25.6 65.5,20 54,20 Z" />
+</vector>
