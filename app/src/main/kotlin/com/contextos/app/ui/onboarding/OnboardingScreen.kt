@@ -447,7 +447,10 @@ fun GoogleSignInScreen(
 private val RELATIONSHIP_OPTIONS = listOf("Family", "Friend", "Colleague", "Doctor")
 
 @Composable
-fun EmergencyContactScreen(onNext: () -> Unit) {
+fun EmergencyContactScreen(
+    onNext: () -> Unit,
+    onSaveContact: (name: String, phone: String, relationship: String) -> Unit = { _, _, _ -> },
+) {
     var name         by remember { mutableStateOf("") }
     var phone        by remember { mutableStateOf("") }
     var relationship by remember { mutableStateOf("Family") }
@@ -503,7 +506,6 @@ fun EmergencyContactScreen(onNext: () -> Unit) {
                 modifier      = Modifier.fillMaxWidth(),
             )
 
-            // Relationship chips
             Text(
                 text  = "Relationship",
                 style = MaterialTheme.typography.labelLarge,
@@ -523,7 +525,10 @@ fun EmergencyContactScreen(onNext: () -> Unit) {
 
             Button(
                 onClick  = {
-                    if (!phoneError) onNext()
+                    if (!phoneError) {
+                        onSaveContact(name, phone, relationship)
+                        onNext()
+                    }
                 },
                 enabled  = name.isNotBlank() && phone.isNotBlank() && !phoneError,
                 modifier = Modifier

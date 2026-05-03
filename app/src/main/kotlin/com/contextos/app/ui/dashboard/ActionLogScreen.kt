@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -41,11 +40,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.contextos.core.data.repository.ActionLogRepository
 import com.contextos.core.service.ContextOSServiceManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -61,7 +64,7 @@ data class ActionLogUiItem(
     val description: String,
     val timestampMs: Long,
     val wasAutoApproved: Boolean,
-    val outcome: String,  // SUCCESS | FAILURE | PENDING_USER_CONFIRMATION | SKIPPED
+    val outcome: String,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,47 +72,28 @@ data class ActionLogUiItem(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @HiltViewModel
-class ActionLogViewModel @Inject constructor() : ViewModel() {
+class ActionLogViewModel @Inject constructor(
+    private val repository: ActionLogRepository,
+) : ViewModel() {
 
-    // Stub list — Phase 5.2 will replace this with a real DB-backed Flow
-    private val _logs = MutableStateFlow(
-        listOf(
-            ActionLogUiItem(
-                id              = 1L,
-                skillName       = "DND Setter",
-                description     = "Enabled Do Not Disturb — meeting starts in 5 minutes",
-                timestampMs     = System.currentTimeMillis() - 3 * 60_000,
-                wasAutoApproved = true,
-                outcome         = "SUCCESS",
-            ),
-            ActionLogUiItem(
-                id              = 2L,
-                skillName       = "Battery Warner",
-                description     = "Battery at 18% — charger not detected. Sent low-battery alert.",
-                timestampMs     = System.currentTimeMillis() - 22 * 60_000,
-                wasAutoApproved = false,
-                outcome         = "PENDING_USER_CONFIRMATION",
-            ),
-            ActionLogUiItem(
-                id              = 3L,
-                skillName       = "Navigation Launcher",
-                description     = "Meeting at Bangalore Tech Park in 40 min — traffic suggests leaving now",
-                timestampMs     = System.currentTimeMillis() - 45 * 60_000,
-                wasAutoApproved = true,
-                outcome         = "SUCCESS",
-            ),
-            ActionLogUiItem(
-                id              = 4L,
-                skillName       = "System Heartbeat",
-                description     = "Service uptime: 3600s | Cycles: 4",
-                timestampMs     = System.currentTimeMillis() - 60 * 60_000,
-                wasAutoApproved = true,
-                outcome         = "SUCCESS",
-            ),
+    val logs: StateFlow<List<ActionLogUiItem>> = repository.getAll()
+        .map { entities ->
+            entities.map { entity ->
+                ActionLogUiItem(
+                    id              = entity.id,
+                    skillName       = entity.skillName,
+                    description     = entity.description,
+                    timestampMs     = entity.timestampMs,
+                    wasAutoApproved = entity.wasAutoApproved,
+                    outcome         = entity.outcome,
+                )
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
         )
-    )
-
-    val logs: StateFlow<List<ActionLogUiItem>> = _logs
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -190,7 +174,7 @@ fun ActionLogCard(
         "SUCCESS"                  -> Color(0xFF4CAF50)
         "FAILURE"                  -> Color(0xFFF44336)
         "PENDING_USER_CONFIRMATION"-> Color(0xFFFFC107)
-        else                       -> Color(0xFF9E9E9E)  // SKIPPED
+        else                       -> Color(0xFF9E9E9E)
     }
 
     Card(
@@ -204,7 +188,6 @@ fun ActionLogCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            // Colored left border strip
             Box(
                 modifier = Modifier
                     .width(4.dp)

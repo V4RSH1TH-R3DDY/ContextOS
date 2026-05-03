@@ -18,7 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -45,58 +44,53 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.contextos.app.ui.dashboard.ActionLogUiItem
+import com.contextos.core.data.repository.ActionLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ViewModel
-// ─────────────────────────────────────────────────────────────────────────────
-
 @HiltViewModel
-class ActionDetailViewModel @Inject constructor() : ViewModel() {
+class ActionDetailViewModel @Inject constructor(
+    private val repository: ActionLogRepository,
+) : ViewModel() {
 
-    // Stub — Phase 5 will fetch the real entry from ActionLogRepository
-    private val _item = MutableStateFlow(
-        ActionLogUiItem(
-            id              = 1L,
-            skillName       = "DND Setter",
-            description     = "Enabled Do Not Disturb — meeting starts in 5 minutes",
-            timestampMs     = System.currentTimeMillis() - 3 * 60_000,
-            wasAutoApproved = true,
-            outcome         = "SUCCESS",
+    val item: StateFlow<ActionLogUiItem?> = repository.getAll()
+        .map { entities ->
+            entities.find { it.id > 0 }?.let { entity ->
+                ActionLogUiItem(
+                    id              = entity.id,
+                    skillName       = entity.skillName,
+                    description     = entity.description,
+                    timestampMs     = entity.timestampMs,
+                    wasAutoApproved = entity.wasAutoApproved,
+                    outcome         = entity.outcome,
+                )
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null,
         )
-    )
-
-    val item: StateFlow<ActionLogUiItem> = _item
-
-    /** Situation snapshot bullet points — Phase 3 will derive these from the real SituationModel. */
-    val situationBullets = listOf(
-        "🔋  Battery: 62%, not charging",
-        "📍  Location: Inferred as 'Office' (WiFi: CorpNet-5G)",
-        "🕑  Time: 9:55 AM, Tuesday",
-        "📅  Next meeting: Stand-up @ 10:00 AM (Google Meet)",
-        "🎙️  Ambient audio: Quiet (office background noise)",
-    )
 
     fun approve() {
-        _item.value = _item.value.copy(outcome = "SUCCESS", wasAutoApproved = true)
+        // TODO: Update action log entry outcome via repository
     }
 
     fun dismiss() {
-        _item.value = _item.value.copy(outcome = "SKIPPED")
+        // TODO: Update action log entry outcome via repository
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen
-// ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,21 +100,56 @@ fun ActionDetailScreen(
     viewModel: ActionDetailViewModel = viewModel(),
 ) {
     val item             by viewModel.item.collectAsState()
-    val situationBullets = viewModel.situationBullets
     var snapshotExpanded by remember { mutableStateOf(false) }
 
-    val outcomeBgColor = when (item.outcome) {
+    if (item == null) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Action Detail", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Text(text = "←", fontSize = 20.sp)
+                        }
+                    },
+                )
+            },
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(text = "Action not found")
+            }
+        }
+        return
+    }
+
+    val currentItem = item!!
+
+    val outcomeBgColor = when (currentItem.outcome) {
         "SUCCESS"                   -> Color(0xFF4CAF50)
         "FAILURE"                   -> Color(0xFFF44336)
         "PENDING_USER_CONFIRMATION" -> Color(0xFFFFC107)
         else                        -> Color(0xFF9E9E9E)
     }
-    val outcomeLabel = when (item.outcome) {
+    val outcomeLabel = when (currentItem.outcome) {
         "SUCCESS"                   -> "✓ Success"
         "FAILURE"                   -> "✗ Failed"
         "PENDING_USER_CONFIRMATION" -> "⏳ Awaiting confirmation"
         else                        -> "— Skipped"
     }
+
+    val situationBullets = listOf(
+        "🔋  Battery: 62%, not charging",
+        "📍  Location: Inferred as 'Office' (WiFi: CorpNet-5G)",
+        "🕑  Time: 9:55 AM, Tuesday",
+        "📅  Next meeting: Stand-up @ 10:00 AM (Google Meet)",
+        "🎙️  Ambient audio: Quiet (office background noise)",
+    )
 
     Scaffold(
         topBar = {
@@ -143,14 +172,13 @@ fun ActionDetailScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
 
-            // ── Header ────────────────────────────────────────────────────────
             Row(
                 modifier          = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text       = item.skillName,
+                    text       = currentItem.skillName,
                     style      = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     modifier   = Modifier.weight(1f),
@@ -166,12 +194,11 @@ fun ActionDetailScreen(
             }
 
             Text(
-                text  = item.description,
+                text  = currentItem.description,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
             )
 
-            // ── Why ContextOS acted ───────────────────────────────────────────
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -215,7 +242,6 @@ fun ActionDetailScreen(
                 }
             }
 
-            // ── Timeline ──────────────────────────────────────────────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape    = RoundedCornerShape(12.dp),
@@ -236,25 +262,24 @@ fun ActionDetailScreen(
                     TimelineStep(
                         icon  = "🔍",
                         label = "Triggered",
-                        value = formatTime(item.timestampMs),
+                        value = formatTime(currentItem.timestampMs),
                     )
                     TimelineStep(
-                        icon  = if (item.wasAutoApproved) "✅" else "⏳",
-                        label = if (item.wasAutoApproved) "Auto-approved" else "Awaiting confirmation",
-                        value = if (item.wasAutoApproved) formatTime(item.timestampMs + 100) else "—",
+                        icon  = if (currentItem.wasAutoApproved) "✅" else "⏳",
+                        label = if (currentItem.wasAutoApproved) "Auto-approved" else "Awaiting confirmation",
+                        value = if (currentItem.wasAutoApproved) formatTime(currentItem.timestampMs + 100) else "—",
                     )
-                    if (item.outcome == "SUCCESS") {
+                    if (currentItem.outcome == "SUCCESS") {
                         TimelineStep(
                             icon  = "🎯",
                             label = "Completed",
-                            value = formatTime(item.timestampMs + 250),
+                            value = formatTime(currentItem.timestampMs + 250),
                         )
                     }
                 }
             }
 
-            // ── Actions (only shown when pending) ─────────────────────────────
-            if (item.outcome == "PENDING_USER_CONFIRMATION") {
+            if (currentItem.outcome == "PENDING_USER_CONFIRMATION") {
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -284,10 +309,6 @@ fun ActionDetailScreen(
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun TimelineStep(icon: String, label: String, value: String) {

@@ -4,9 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import com.contextos.app.ui.navigation.ContextOSNavGraph
 import com.contextos.app.ui.navigation.Screen
+import com.contextos.app.ui.navigation.StartDestinationViewModel
 import com.contextos.app.ui.theme.ContextOSTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -19,13 +23,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             ContextOSTheme {
                 val navController = rememberNavController()
+                val viewModel: StartDestinationViewModel = viewModel()
+                val startDestination by viewModel.startDestination.collectAsState(Screen.Onboarding.Welcome.route)
 
-                // TODO (Phase 5.1): Replace with a real first-run check backed by DataStore.
-                //   • First run  → startDestination = Screen.Onboarding.Welcome.route
-                //   • Returning  → startDestination = Screen.Dashboard.route
                 ContextOSNavGraph(
                     navController    = navController,
-                    startDestination = Screen.Onboarding.Welcome.route,
+                    startDestination = startDestination,
                 )
             }
         }

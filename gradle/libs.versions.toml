@@ -16,6 +16,7 @@ activity-compose            = "1.8.2"
 core-ktx                    = "1.12.0"
 play-services-auth          = "21.0.0"
 play-services-location      = "21.1.0"
+datastore                   = "1.0.0"
 google-api-client-android   = "2.2.0"
 google-api-services-calendar = "v3-rev20231123-2.0.0"
 google-api-services-gmail   = "v1-rev20231002-2.0.0"
@@ -73,6 +74,9 @@ okhttp-logging-interceptor          = { group = "com.squareup.okhttp3",      nam
 # Kotlin Serialization
 kotlinx-serialization-json          = { group = "org.jetbrains.kotlinx",     name = "kotlinx-serialization-json",      version.ref = "serialization" }
 retrofit-serialization-converter    = { group = "com.jakewharton.retrofit",  name = "retrofit2-kotlinx-serialization-converter", version = "0.8.0" }
+
+# DataStore
+androidx-datastore-preferences      = { group = "androidx.datastore",          name = "datastore-preferences",           version.ref = "datastore" }
 
 # Google Play Services
 play-services-auth                  = { group = "com.google.android.gms",    name = "play-services-auth",              version.ref = "play-services-auth" }

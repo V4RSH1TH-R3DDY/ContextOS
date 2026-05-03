@@ -1,6 +1,8 @@
 package com.contextos.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -14,12 +16,6 @@ import com.contextos.app.ui.onboarding.PermissionsScreen
 import com.contextos.app.ui.onboarding.WelcomeScreen
 import com.contextos.app.ui.settings.SettingsScreen
 
-/**
- * Root navigation graph for ContextOS.
- *
- * First-run users start at [Screen.Onboarding.Welcome]; returning users start at
- * [Screen.Dashboard] (caller is responsible for passing the correct [startDestination]).
- */
 @Composable
 fun ContextOSNavGraph(
     navController: NavHostController,
@@ -29,8 +25,6 @@ fun ContextOSNavGraph(
         navController    = navController,
         startDestination = startDestination,
     ) {
-
-        // ── Onboarding ────────────────────────────────────────────────────────
 
         composable(Screen.Onboarding.Welcome.route) {
             WelcomeScreen(
@@ -52,17 +46,19 @@ fun ContextOSNavGraph(
         }
 
         composable(Screen.Onboarding.EmergencyContact.route) {
+            val viewModel: OnboardingCompleteViewModel = viewModel()
             EmergencyContactScreen(
                 onNext = {
+                    viewModel.markOnboardingComplete()
                     navController.navigate(Screen.Dashboard.route) {
-                        // Clear the entire onboarding back-stack so Back doesn't return to it
                         popUpTo(Screen.Onboarding.Welcome.route) { inclusive = true }
                     }
-                }
+                },
+                onSaveContact = { name, phone, relationship ->
+                    viewModel.saveEmergencyContact(name, phone, relationship)
+                },
             )
         }
-
-        // ── Main app ──────────────────────────────────────────────────────────
 
         composable(Screen.Dashboard.route) {
             ActionLogScreen(
@@ -78,8 +74,6 @@ fun ContextOSNavGraph(
                 onBack = { navController.popBackStack() }
             )
         }
-
-        // ── Detail ────────────────────────────────────────────────────────────
 
         composable(
             route     = Screen.ActionDetail.route,
