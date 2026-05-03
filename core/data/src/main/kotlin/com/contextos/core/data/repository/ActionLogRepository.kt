@@ -39,4 +39,10 @@ class ActionLogRepository @Inject constructor(
      * Returns the number of rows deleted.
      */
     suspend fun deleteOlderThan(timestampMs: Long): Int = dao.deleteOlderThan(timestampMs)
+
+    suspend fun countSuccessfulTriggersSince(skillId: String, sinceMs: Long): Int =
+        dao.countSuccessfulTriggersSince(skillId, sinceMs)
+
+    suspend fun countDismissalsSince(skillId: String, sinceMs: Long): Int =
+        dao.countDismissalsSince(skillId, sinceMs)
 }

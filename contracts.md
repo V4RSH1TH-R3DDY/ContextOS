@@ -394,7 +394,7 @@ Entity: `com.contextos.core.data.db.entity.LocationMemoryEntity`
 |---|---|
 | `:app` | UI layer (Compose screens, ViewModels, Navigation). |
 | `:core:service` | `ContextAgentWorker` (WorkManager), cycle orchestration, sensor data collection. |
-| `:core:skills` | `Skill` interface, `SkillResult`, `SkillRegistry`, all skill implementations. |
+| `:core:skills` | `Skill` interface, `SkillResult`, `SkillRegistry`, all skill implementations (DND, Battery Warner, Navigation Launcher). |
 | `:core:memory` | `RoutineMemoryManager`, `PreferenceMemoryManager`, `LocationMemoryManager`. Wraps `:core:data` DAOs with domain logic. |
 | `:core:network` | `GoogleAuthManager`, Google API clients (Calendar, Gmail, Drive), `MapsDistanceMatrixClient`, OkHttp/Retrofit setup. |
 | `:core:data` | Room database, all entities and DAOs, `SituationModel`, model classes, `DatabaseModule`. |
@@ -405,7 +405,7 @@ Entity: `com.contextos.core.data.db.entity.LocationMemoryEntity`
   `:core:network`, `:core:skills`, or `:core:service`.
 - **No lateral dependencies.** `:core:memory` and `:core:network` must not depend
   on each other.
-- `:core:skills` may depend only on `:core:data` (for `SituationModel`).
+- `:core:skills` may depend on `:core:data` (for `SituationModel`) and `:core:network` (for `MapsDistanceMatrixClient`).
 - `:core:service` is the only module that may depend on all other `:core:*` modules.
 
 ---
@@ -428,10 +428,10 @@ and used to key user preferences. Once assigned, a skill ID must **never change*
 
 | ID | Skill Name | Phase |
 |---|---|---|
-| `dnd_setter` | DND Setter | Phase 1.x |
-| `battery_warner` | Battery Warner | Phase 1.x |
-| `navigation_launcher` | Navigation Launcher | Phase 2.x |
-| `meeting_preparer` | Meeting Preparer | Phase 1.5 |
+| `system.phase_one_heartbeat` | Phase 1 Heartbeat | Phase 1.x (stub) |
+| `dnd_setter` | DND Setter | Phase 2.1 |
+| `battery_warner` | Battery Warner | Phase 2.2 |
+| `navigation_launcher` | Navigation Launcher | Phase 2.3 |
 
 > Add new entries here when you introduce a new skill.
 

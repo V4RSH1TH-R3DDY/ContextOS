@@ -24,4 +24,10 @@ interface ActionLogDao {
 
     @Query("DELETE FROM action_log WHERE timestampMs < :timestampMs")
     suspend fun deleteOlderThan(timestampMs: Long): Int
+
+    @Query("SELECT COUNT(*) FROM action_log WHERE skillId = :skillId AND timestampMs >= :sinceMs AND outcome = 'SUCCESS'")
+    suspend fun countSuccessfulTriggersSince(skillId: String, sinceMs: Long): Int
+
+    @Query("SELECT COUNT(*) FROM action_log WHERE skillId = :skillId AND timestampMs >= :sinceMs AND userOverride = 'DISMISSED'")
+    suspend fun countDismissalsSince(skillId: String, sinceMs: Long): Int
 }

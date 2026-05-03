@@ -17,12 +17,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "MAPS_API_KEY", "\"${System.getenv("MAPS_API_KEY") ?: "YOUR_MAPS_API_KEY"}\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            buildConfigField("String", "MAPS_API_KEY", "\"${System.getenv("MAPS_API_KEY") ?: "YOUR_MAPS_API_KEY"}\"")
         }
     }
 

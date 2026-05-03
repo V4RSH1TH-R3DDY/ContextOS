@@ -1,5 +1,8 @@
 package com.contextos.core.skills.di
 
+import com.contextos.core.skills.BatteryWarnerSkill
+import com.contextos.core.skills.DndSetterSkill
+import com.contextos.core.skills.NavigationLauncherSkill
 import com.contextos.core.skills.PhaseOneHeartbeatSkill
 import com.contextos.core.skills.Skill
 import dagger.Module
@@ -25,4 +28,16 @@ abstract class SkillsModule {
     @Binds
     @IntoSet
     abstract fun bindPhaseOneHeartbeatSkill(skill: PhaseOneHeartbeatSkill): Skill
+
+    @Binds
+    @IntoSet
+    abstract fun bindDndSetterSkill(skill: DndSetterSkill): Skill
+
+    @Binds
+    @IntoSet
+    abstract fun bindBatteryWarnerSkill(skill: BatteryWarnerSkill): Skill
+
+    @Binds
+    @IntoSet
+    abstract fun bindNavigationLauncherSkill(skill: NavigationLauncherSkill): Skill
 }

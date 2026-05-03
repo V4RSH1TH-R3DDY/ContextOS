@@ -48,4 +48,5 @@ dependencies {
 
     // Project modules
     implementation(project(":core:data"))
+    implementation(project(":core:network"))
 }
