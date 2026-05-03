@@ -1,16 +1,22 @@
 package com.contextos.core.service
 
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.contextos.core.skills.SkillRegistry
+import com.contextos.core.network.CalendarSyncWorker
+import com.contextos.core.service.agent.ContextAgent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -19,16 +25,20 @@ import javax.inject.Inject
 
 /**
  * Long-running foreground service that hosts the ContextOS agent loop.
- * Started via [ContextOSServiceManager]; uses [SkillRegistry] to evaluate and
- * dispatch skills on every heartbeat cycle.
+ * Started via [ContextOSServiceManager]; delegates all sensing and skill evaluation
+ * to [ContextAgent] on every heartbeat cycle.
+ *
+ * A backup [AlarmManager] alarm and a [AgentCycleWorker] WorkManager job are also
+ * scheduled so the agent runs even when the OS trims the process.
  */
 @AndroidEntryPoint
 class ContextOSService : Service() {
 
-    @Inject
-    lateinit var skillRegistry: SkillRegistry
+    @Inject lateinit var contextAgent: ContextAgent
+    @Inject lateinit var healthMonitor: ServiceHealthMonitor
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var agentLoopJob: Job? = null
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -67,12 +77,64 @@ class ContextOSService : Service() {
     // -------------------------------------------------------------------------
 
     private fun startAgentLoop() {
-        serviceScope.launch {
+        if (agentLoopJob?.isActive == true) {
+            Log.d(TAG, "Agent loop already running")
+            return
+        }
+
+        agentLoopJob = serviceScope.launch {
+            healthMonitor.recordServiceStart()
+            AgentCycleWorker.schedule(applicationContext)
+            CalendarSyncWorker.schedule(applicationContext)
+            scheduleExactAlarm()
             while (true) {
-                Log.i(TAG, "ContextOS heartbeat — cycle started")
-                // TODO: build SituationModel and evaluate skills via skillRegistry
+                try {
+                    contextAgent.runCycle()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Agent cycle error", e)
+                }
                 delay(HEARTBEAT_INTERVAL_MS)
             }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Exact alarm (wakeup backup for Doze mode)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Schedules a single exact alarm that will re-deliver [ACTION_START] to this service
+     * [HEARTBEAT_INTERVAL_MS] from now. This ensures the service wakes up even if the OS
+     * kills it while the device is in Doze mode.
+     *
+     * The service reschedules the alarm each time [onStartCommand] is called (including
+     * when the alarm fires), so effectively creating a self-rescheduling wakeup chain.
+     */
+    private fun scheduleExactAlarm() {
+        val alarmManager = getSystemService(AlarmManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            Log.w(TAG, "Exact alarm permission unavailable; relying on WorkManager fallback")
+            return
+        }
+
+        val intent = Intent(this, ContextOSService::class.java).apply {
+            action = ACTION_START
+        }
+        val pendingIntent = PendingIntent.getService(
+            this,
+            ALARM_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        try {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                SystemClock.elapsedRealtime() + HEARTBEAT_INTERVAL_MS,
+                pendingIntent,
+            )
+            Log.d(TAG, "scheduleExactAlarm: next wakeup in ${HEARTBEAT_INTERVAL_MS / 60_000} min")
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Exact alarm scheduling denied; relying on WorkManager fallback", e)
         }
     }
 
@@ -106,10 +168,14 @@ class ContextOSService : Service() {
     companion object {
         private const val TAG = "ContextOSService"
         private const val CHANNEL_ID = "contextos_service"
+
+        /** Primary heartbeat cadence — also used as the exact-alarm interval. */
         private const val HEARTBEAT_INTERVAL_MS = 15L * 60 * 1_000 // 15 minutes
 
+        private const val ALARM_REQUEST_CODE = 42
+
         const val ACTION_START = "com.contextos.START"
-        const val ACTION_STOP = "com.contextos.STOP"
+        const val ACTION_STOP  = "com.contextos.STOP"
         const val NOTIFICATION_ID = 1001
     }
 }

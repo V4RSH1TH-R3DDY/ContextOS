@@ -7,8 +7,23 @@ import dagger.hilt.components.SingletonComponent
 /**
  * Hilt module for the `:core:service` module.
  *
- * Concrete @Provides / @Binds declarations will be added here in later phases
- * as the service layer grows (e.g., providing the SituationModelBuilder, ActionDispatcher, etc.).
+ * ## Phase 1 — Core Infrastructure
+ *
+ * All Phase 1 service-layer classes are annotated with `@Singleton @Inject constructor(...)`,
+ * so Hilt binds them automatically without explicit `@Provides` declarations:
+ *
+ *  - [com.contextos.core.service.SensorDataCollector]
+ *  - [com.contextos.core.service.SituationModelBuilder]
+ *  - [com.contextos.core.service.ServiceHealthMonitor]
+ *  - [com.contextos.core.service.agent.ActionDispatcher]
+ *  - [com.contextos.core.service.agent.ContextAgent]
+ *
+ * [com.contextos.core.network.CalendarSyncWorker] and
+ * [com.contextos.core.service.AgentCycleWorker] are `@HiltWorker` and are
+ * handled automatically by the Hilt-Work integration.
+ *
+ * Future phases may add explicit `@Provides` / `@Binds` declarations here as the service
+ * layer grows (e.g. providing platform-specific implementations via interfaces).
  */
 @Module
 @InstallIn(SingletonComponent::class)

@@ -2,6 +2,7 @@ package com.contextos.core.network
 
 import android.util.Log
 import com.contextos.core.data.model.CalendarEventSummary
+import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
@@ -47,9 +48,22 @@ class CalendarApiClient @Inject constructor(
      * - Meeting links are extracted from both the description and location fields.
      */
     suspend fun getUpcomingEvents(hoursAhead: Int = 8): List<CalendarEventSummary> =
+        syncUpcomingEvents(hoursAhead = hoursAhead, syncToken = null).events
+
+    /**
+     * Syncs upcoming events and returns the next incremental sync token when Google provides it.
+     *
+     * If [syncToken] is present, the request uses Calendar's incremental sync mode and returns
+     * changed/deleted items since the previous sync. A 410 response means the token expired and
+     * callers should discard it and run a full sync.
+     */
+    suspend fun syncUpcomingEvents(
+        hoursAhead: Int = 8,
+        syncToken: String?,
+    ): CalendarSyncResult =
         withContext(Dispatchers.IO) {
             val service = buildService()
-                ?: return@withContext emptyList<CalendarEventSummary>().also {
+                ?: return@withContext CalendarSyncResult.empty().also {
                     Log.w(TAG, "getUpcomingEvents: not signed in")
                 }
 
@@ -58,15 +72,26 @@ class CalendarApiClient @Inject constructor(
 
             try {
                 retryWithBackoff(tag = TAG) {
-                    val result = service.events().list("primary")
-                        .setTimeMin(DateTime(now))
-                        .setTimeMax(DateTime(until))
-                        .setOrderBy("startTime")
+                    val request = service.events().list("primary")
                         .setSingleEvents(true)
-                        .setMaxResults(20)
-                        .execute()
+                        .setMaxResults(50)
 
-                    (result.items ?: emptyList()).map { event ->
+                    if (syncToken.isNullOrBlank()) {
+                        request
+                            .setTimeMin(DateTime(now))
+                            .setTimeMax(DateTime(until))
+                            .setOrderBy("startTime")
+                    } else {
+                        request.setSyncToken(syncToken)
+                    }
+
+                    val result = request.execute()
+                    val deletedEventIds = mutableListOf<String>()
+                    val events = (result.items ?: emptyList()).mapNotNull { event ->
+                        if (event.status == "cancelled") {
+                            event.id?.let { deletedEventIds += it }
+                            return@mapNotNull null
+                        }
                         val description = event.description.orEmpty()
                         val location    = event.location.orEmpty()
                         val meetingLink = extractMeetingLink("$description $location")
@@ -88,13 +113,27 @@ class CalendarApiClient @Inject constructor(
                             isVirtual   = isVirtual,
                         )
                     }
+                    CalendarSyncResult(
+                        events = events,
+                        deletedEventIds = deletedEventIds,
+                        nextSyncToken = result.nextSyncToken,
+                        tokenExpired = false,
+                    )
                 }
             } catch (e: UserRecoverableAuthIOException) {
                 Log.w(TAG, "User needs to re-authorize Calendar access", e)
-                emptyList()
+                CalendarSyncResult.empty()
+            } catch (e: GoogleJsonResponseException) {
+                if (e.statusCode == HTTP_GONE) {
+                    Log.w(TAG, "Calendar sync token expired; full sync required")
+                    CalendarSyncResult(tokenExpired = true)
+                } else {
+                    Log.e(TAG, "Calendar API error", e)
+                    CalendarSyncResult.empty()
+                }
             } catch (e: IOException) {
                 Log.e(TAG, "Failed to fetch events after retries", e)
-                emptyList()
+                CalendarSyncResult.empty()
             }
         }
 
@@ -110,6 +149,7 @@ class CalendarApiClient @Inject constructor(
     companion object {
         private const val TAG      = "CalendarApiClient"
         private const val APP_NAME = "ContextOS"
+        private const val HTTP_GONE = 410
 
         private val HTTP_TRANSPORT = NetHttpTransport()
         private val JSON_FACTORY   = GsonFactory.getDefaultInstance()
@@ -127,5 +167,16 @@ class CalendarApiClient @Inject constructor(
             "zoom.us", "meet.google", "teams.microsoft", "webex.com",
             "whereby.com", "around.co",
         )
+    }
+}
+
+data class CalendarSyncResult(
+    val events: List<CalendarEventSummary> = emptyList(),
+    val deletedEventIds: List<String> = emptyList(),
+    val nextSyncToken: String? = null,
+    val tokenExpired: Boolean = false,
+) {
+    companion object {
+        fun empty() = CalendarSyncResult()
     }
 }

@@ -22,4 +22,7 @@ interface CalendarEventCacheDao {
 
     @Query("DELETE FROM calendar_event_cache WHERE endTime < :timestampMs")
     suspend fun deleteEventsBefore(timestampMs: Long): Int
+
+    @Query("DELETE FROM calendar_event_cache WHERE eventId = :eventId")
+    suspend fun deleteByEventId(eventId: String): Int
 }

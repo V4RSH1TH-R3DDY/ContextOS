@@ -8,29 +8,33 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.contextos.core.skills.SkillRegistry
+import com.contextos.core.service.agent.ContextAgent
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
 /**
  * Battery-optimised periodic worker that triggers the ContextOS agent cycle via WorkManager.
+ *
  * Complements [ContextOSService]: the service provides real-time reactivity while this worker
- * ensures the agent runs even when the service is not in the foreground.
+ * ensures the agent runs even when the service has been trimmed by the OS.
  */
 @HiltWorker
 class AgentCycleWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val skillRegistry: SkillRegistry,
+    private val contextAgent: ContextAgent,
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         Log.i(TAG, "ContextOS agent cycle — WorkManager trigger")
-
-        // TODO: build SituationModel from repositories and evaluate skills via skillRegistry
-
-        return Result.success()
+        return try {
+            contextAgent.runCycle()
+            Result.success()
+        } catch (e: Exception) {
+            Log.e(TAG, "Agent cycle failed in WorkManager", e)
+            Result.retry()
+        }
     }
 
     companion object {
@@ -45,7 +49,7 @@ class AgentCycleWorker @AssistedInject constructor(
          */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<AgentCycleWorker>(
-                repeatInterval = 15L,
+                repeatInterval         = 15L,
                 repeatIntervalTimeUnit = TimeUnit.MINUTES,
             ).build()
 

@@ -1,9 +1,12 @@
 package com.contextos.core.skills.di
 
+import com.contextos.core.skills.PhaseOneHeartbeatSkill
 import com.contextos.core.skills.Skill
 import dagger.Module
+import dagger.Binds
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
 
 /**
@@ -18,4 +21,8 @@ abstract class SkillsModule {
 
     @Multibinds
     abstract fun bindSkillSet(): Set<Skill>
+
+    @Binds
+    @IntoSet
+    abstract fun bindPhaseOneHeartbeatSkill(skill: PhaseOneHeartbeatSkill): Skill
 }
