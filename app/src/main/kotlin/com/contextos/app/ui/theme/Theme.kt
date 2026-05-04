@@ -114,9 +114,10 @@ fun ContextOSTheme(
         SideEffect {
             val window = (view.context as Activity).window
             @Suppress("DEPRECATION")
-            window.statusBarColor = colorScheme.primary.toArgb()
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
             WindowCompat.getInsetsController(window, view)
                 .isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.setDecorFitsSystemWindows(window, false)
         }
     }
 

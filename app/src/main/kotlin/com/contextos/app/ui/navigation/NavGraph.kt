@@ -1,7 +1,7 @@
 package com.contextos.app.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -45,7 +45,7 @@ fun ContextOSNavGraph(
         }
 
         composable(Screen.Onboarding.EmergencyContact.route) {
-            val onboardingViewModel: OnboardingCompleteViewModel = viewModel()
+            val onboardingViewModel: OnboardingCompleteViewModel = hiltViewModel()
             EmergencyContactScreen(
                 onNext = {
                     onboardingViewModel.markOnboardingComplete()

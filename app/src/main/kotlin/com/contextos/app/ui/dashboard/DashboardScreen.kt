@@ -68,7 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.contextos.app.ui.theme.BgDark
 import com.contextos.app.ui.theme.DividerLine
 import com.contextos.app.ui.theme.IndigoBase
@@ -172,7 +172,7 @@ class DashboardViewModel @Inject constructor(
 fun DashboardScreen(
     onSettingsClick: () -> Unit,
     onActionClick: (Long) -> Unit,
-    viewModel: DashboardViewModel = viewModel(),
+    viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val messages by viewModel._messages
