@@ -40,9 +40,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.contextos.app.ui.theme.BgDark
+import com.contextos.app.ui.theme.Background
+import com.contextos.app.ui.theme.Accent
 import com.contextos.app.ui.theme.DividerLine
-import com.contextos.app.ui.theme.IndigoBase
 import com.contextos.app.ui.theme.OutlineStroke
 import com.contextos.app.ui.theme.SurfaceCard
 import com.contextos.app.ui.theme.SuccessGreen
@@ -60,7 +60,7 @@ fun ActionDetailScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = BgDark,
+        color = Background,
     ) {
         Column(
             modifier = Modifier
@@ -220,12 +220,12 @@ fun ActionDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 TimelineStep(
-                    color = IndigoBase,
+                    color = Accent,
                     label = "Triggered",
                     time = "9:55",
                 )
                 TimelineStep(
-                    color = IndigoBase,
+                    color = Accent,
                     label = "Approved",
                     time = "9:55",
                 )

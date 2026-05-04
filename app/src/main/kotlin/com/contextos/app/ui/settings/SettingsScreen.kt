@@ -44,12 +44,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.contextos.app.ui.theme.BgDark
+import com.contextos.app.ui.theme.Background
 import com.contextos.app.ui.theme.DividerLine
-import com.contextos.app.ui.theme.IndigoBase
+import com.contextos.app.ui.theme.Accent
 import com.contextos.app.ui.theme.OutlineStroke
 import com.contextos.app.ui.theme.SurfaceCard
-import com.contextos.app.ui.theme.SurfaceEnabled
+import com.contextos.app.ui.theme.SurfaceHover
 import com.contextos.app.ui.theme.TextPrimary
 import com.contextos.app.ui.theme.TextSecondary
 import com.contextos.app.ui.theme.TextTertiary
@@ -170,7 +170,7 @@ fun SettingsScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = BgDark,
+        color = Background,
     ) {
         Column(
             modifier = Modifier
@@ -214,7 +214,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(
-                                if (enabled) SurfaceEnabled else SurfaceCard,
+                                if (enabled) SurfaceHover else SurfaceCard,
                                 RoundedCornerShape(16.dp),
                             )
                             .padding(16.dp),
@@ -266,8 +266,8 @@ fun SettingsScreen(
                                     steps = 2,
                                     modifier = Modifier.weight(1f),
                                     colors = SliderDefaults.colors(
-                                        thumbColor = IndigoBase,
-                                        activeTrackColor = IndigoBase,
+                                        thumbColor = Accent,
+                                        activeTrackColor = Accent,
                                         inactiveTrackColor = OutlineStroke,
                                     ),
                                 )
@@ -377,7 +377,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.Default.Person,
                         contentDescription = null,
-                        tint = IndigoBase,
+                        tint = Accent,
                         modifier = Modifier.size(20.dp),
                     )
                     Column {
@@ -395,7 +395,7 @@ fun SettingsScreen(
                     }
                 }
                 TextButton(onClick = { /* TODO */ }) {
-                    Text(text = "Edit", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = IndigoBase)
+                    Text(text = "Edit", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Accent)
                 }
             }
 
@@ -420,7 +420,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.Default.Email,
                         contentDescription = null,
-                        tint = IndigoBase,
+                        tint = Accent,
                         modifier = Modifier.size(20.dp),
                     )
                     Column {
@@ -438,7 +438,7 @@ fun SettingsScreen(
                     }
                 }
                 TextButton(onClick = { /* TODO */ }) {
-                    Text(text = "Sign", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = IndigoBase)
+                    Text(text = "Sign", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Accent)
                 }
             }
 
@@ -496,7 +496,7 @@ private fun SectionHeader(title: String) {
         text = title.uppercase(),
         fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
-        color = IndigoBase,
+        color = Accent,
         letterSpacing = 1.sp,
     )
 }
@@ -511,7 +511,7 @@ private fun CustomToggleSwitch(
             .width(48.dp)
             .height(24.dp)
             .background(
-                if (enabled) IndigoBase else OutlineStroke,
+                if (enabled) Accent else OutlineStroke,
                 RoundedCornerShape(12.dp),
             )
             .clickable { onToggle(!enabled) },
@@ -533,7 +533,7 @@ private fun CustomRadio(selected: Boolean) {
             .size(20.dp)
             .border(
                 width = 2.dp,
-                color = if (selected) IndigoBase else OutlineStroke,
+                color = if (selected) Accent else OutlineStroke,
                 shape = CircleShape,
             ),
         contentAlignment = Alignment.Center,
@@ -542,7 +542,7 @@ private fun CustomRadio(selected: Boolean) {
             Box(
                 modifier = Modifier
                     .size(12.dp)
-                    .background(IndigoBase, CircleShape),
+                    .background(Accent, CircleShape),
             )
         }
     }

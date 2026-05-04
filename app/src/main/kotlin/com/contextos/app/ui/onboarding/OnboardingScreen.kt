@@ -69,10 +69,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.contextos.app.ui.theme.BgDark
-import com.contextos.app.ui.theme.BgGradientEnd
+import com.contextos.app.ui.theme.Background
+import com.contextos.app.ui.theme.SurfaceBg
 import com.contextos.app.ui.theme.DividerLine
-import com.contextos.app.ui.theme.IndigoBase
+import com.contextos.app.ui.theme.Accent
 import com.contextos.app.ui.theme.OutlineStroke
 import com.contextos.app.ui.theme.SurfaceCard
 import com.contextos.app.ui.theme.SurfaceInput
@@ -116,7 +116,7 @@ fun WelcomeScreen(onNext: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(colors = listOf(BgDark, BgGradientEnd))),
+                .background(Brush.verticalGradient(colors = listOf(Background, SurfaceBg))),
         ) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
@@ -128,15 +128,15 @@ fun WelcomeScreen(onNext: () -> Unit) {
                     modifier = Modifier
                         .size(128.dp)
                         .scale(pulseScale)
-                        .background(IndigoBase.copy(alpha = 0.1f), CircleShape)
-                        .border(4.dp, IndigoBase, CircleShape),
+                        .background(Accent.copy(alpha = 0.1f), CircleShape)
+                        .border(4.dp, Accent, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.PhoneAndroid,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
-                        tint = IndigoBase,
+                        tint = Accent,
                     )
                 }
 
@@ -175,7 +175,7 @@ fun WelcomeScreen(onNext: () -> Unit) {
                 Button(
                     onClick = onNext,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = IndigoBase, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White),
                     shape = RoundedCornerShape(16.dp),
                 ) {
                     Text(text = "Get Started", fontSize = 16.sp, fontWeight = FontWeight.Medium)
@@ -198,7 +198,7 @@ fun PermissionsScreen(onNext: () -> Unit) {
         onNext()
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = BgDark) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Background) {
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp).verticalScroll(rememberScrollState()),
         ) {
@@ -241,7 +241,7 @@ fun PermissionsScreen(onNext: () -> Unit) {
             Button(
                 onClick = { launcher.launch(permissionsToRequest) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = IndigoBase, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
             ) {
                 Text(text = "Grant Permissions", fontSize = 16.sp, fontWeight = FontWeight.Medium)
@@ -276,7 +276,7 @@ private fun PermissionCard(item: PermissionItem) {
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Box(
-            modifier = Modifier.size(48.dp).background(IndigoBase, CircleShape),
+            modifier = Modifier.size(48.dp).background(Accent, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(imageVector = item.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
@@ -291,7 +291,7 @@ private fun PermissionCard(item: PermissionItem) {
 
 @Composable
 fun GoogleSignInScreen(onSignIn: () -> Unit, onSkip: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize(), color = BgDark) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Background) {
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -339,7 +339,7 @@ fun GoogleSignInScreen(onSignIn: () -> Unit, onSkip: () -> Unit) {
                         verticalAlignment = Alignment.Top,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(text = "•", fontSize = 14.sp, color = IndigoBase, modifier = Modifier.padding(top = 2.dp))
+                        Text(text = "•", fontSize = 14.sp, color = Accent, modifier = Modifier.padding(top = 2.dp))
                         Text(text = feature, fontSize = 14.sp, color = TextPrimary)
                     }
                 }
@@ -351,9 +351,9 @@ fun GoogleSignInScreen(onSignIn: () -> Unit, onSkip: () -> Unit) {
                 onClick = onSignIn,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(2.dp, IndigoBase),
+                border = androidx.compose.foundation.BorderStroke(2.dp, Accent),
             ) {
-                Text(text = "Sign in with Google", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = IndigoBase)
+                Text(text = "Sign in with Google", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Accent)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -380,7 +380,7 @@ fun EmergencyContactScreen(
 
     val isValid = name.trim().isNotEmpty() && phone.trim().isNotEmpty() && relationship.isNotEmpty()
 
-    Surface(modifier = Modifier.fillMaxSize(), color = BgDark) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Background) {
         Column(
             modifier = Modifier.fillMaxSize()
                 .padding(horizontal = 32.dp)
@@ -417,7 +417,7 @@ fun EmergencyContactScreen(
                             .background(SurfaceInput, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = TextPrimary),
                         singleLine = true,
-                        cursorBrush = SolidColor(IndigoBase),
+                        cursorBrush = SolidColor(Accent),
                         decorationBox = { innerTextField ->
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                                 if (name.isEmpty()) Text(text = "John Doe", fontSize = 16.sp, color = TextTertiary)
@@ -444,7 +444,7 @@ fun EmergencyContactScreen(
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = TextPrimary),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        cursorBrush = SolidColor(IndigoBase),
+                        cursorBrush = SolidColor(Accent),
                         decorationBox = { innerTextField ->
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                                 if (phone.isEmpty()) Text(text = "+1 555 0123", fontSize = 16.sp, color = TextTertiary)
@@ -471,9 +471,9 @@ fun EmergencyContactScreen(
                                 onClick = { relationship = rel },
                                 label = { Text(text = rel, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = if (selected) IndigoBase else SurfaceInput,
+                                    containerColor = if (selected) Accent else SurfaceInput,
                                     labelColor = if (selected) Color.White else TextSecondary,
-                                    selectedContainerColor = IndigoBase,
+                                    selectedContainerColor = Accent,
                                     selectedLabelColor = Color.White,
                                 ),
                                 shape = RoundedCornerShape(12.dp),
@@ -493,7 +493,7 @@ fun EmergencyContactScreen(
                 enabled = isValid,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isValid) IndigoBase else DividerLine,
+                    containerColor = if (isValid) Accent else DividerLine,
                     contentColor = if (isValid) Color.White else TextTertiary,
                 ),
                 shape = RoundedCornerShape(16.dp),
