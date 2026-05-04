@@ -1,14 +1,13 @@
 package com.contextos.app.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.contextos.app.ui.dashboard.ActionLogScreen
+import com.contextos.app.ui.dashboard.DashboardScreen
 import com.contextos.app.ui.detail.ActionDetailScreen
 import com.contextos.app.ui.onboarding.EmergencyContactScreen
 import com.contextos.app.ui.onboarding.GoogleSignInScreen
@@ -22,7 +21,7 @@ fun ContextOSNavGraph(
     startDestination: String = Screen.Onboarding.Welcome.route,
 ) {
     NavHost(
-        navController    = navController,
+        navController = navController,
         startDestination = startDestination,
     ) {
 
@@ -46,24 +45,24 @@ fun ContextOSNavGraph(
         }
 
         composable(Screen.Onboarding.EmergencyContact.route) {
-            val viewModel: OnboardingCompleteViewModel = viewModel()
+            val onboardingViewModel: OnboardingCompleteViewModel = viewModel()
             EmergencyContactScreen(
                 onNext = {
-                    viewModel.markOnboardingComplete()
+                    onboardingViewModel.markOnboardingComplete()
                     navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.Onboarding.Welcome.route) { inclusive = true }
                     }
                 },
                 onSaveContact = { name, phone, relationship ->
-                    viewModel.saveEmergencyContact(name, phone, relationship)
+                    onboardingViewModel.saveEmergencyContact(name, phone, relationship)
                 },
             )
         }
 
         composable(Screen.Dashboard.route) {
-            ActionLogScreen(
+            DashboardScreen(
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                onLogItemClick  = { logId ->
+                onActionClick = { logId ->
                     navController.navigate(Screen.ActionDetail.createRoute(logId))
                 },
             )
@@ -76,14 +75,14 @@ fun ContextOSNavGraph(
         }
 
         composable(
-            route     = Screen.ActionDetail.route,
+            route = Screen.ActionDetail.route,
             arguments = listOf(
                 navArgument(Screen.ActionDetail.ARG_LOG_ID) { type = NavType.LongType }
             ),
         ) { backStackEntry ->
             val logId = backStackEntry.arguments?.getLong(Screen.ActionDetail.ARG_LOG_ID) ?: -1L
             ActionDetailScreen(
-                logId  = logId,
+                logId = logId,
                 onBack = { navController.popBackStack() },
             )
         }

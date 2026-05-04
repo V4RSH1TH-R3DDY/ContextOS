@@ -1,6 +1,8 @@
 package com.contextos.app.ui.detail
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,21 +20,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,301 +37,259 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.contextos.app.ui.dashboard.ActionLogUiItem
-import com.contextos.core.data.repository.ActionLogRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import javax.inject.Inject
+import com.contextos.app.ui.theme.BgDark
+import com.contextos.app.ui.theme.DividerLine
+import com.contextos.app.ui.theme.IndigoBase
+import com.contextos.app.ui.theme.OutlineStroke
+import com.contextos.app.ui.theme.SurfaceCard
+import com.contextos.app.ui.theme.SuccessGreen
+import com.contextos.app.ui.theme.TextPrimary
+import com.contextos.app.ui.theme.TextSecondary
+import com.contextos.app.ui.theme.TextTertiary
 
-@HiltViewModel
-class ActionDetailViewModel @Inject constructor(
-    private val repository: ActionLogRepository,
-) : ViewModel() {
-
-    val item: StateFlow<ActionLogUiItem?> = repository.getAll()
-        .map { entities ->
-            entities.find { it.id > 0 }?.let { entity ->
-                ActionLogUiItem(
-                    id              = entity.id,
-                    skillName       = entity.skillName,
-                    description     = entity.description,
-                    timestampMs     = entity.timestampMs,
-                    wasAutoApproved = entity.wasAutoApproved,
-                    outcome         = entity.outcome,
-                )
-            }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = null,
-        )
-
-    fun approve() {
-        // TODO: Update action log entry outcome via repository
-    }
-
-    fun dismiss() {
-        // TODO: Update action log entry outcome via repository
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActionDetailScreen(
-    logId:     Long,
-    onBack:    () -> Unit,
-    viewModel: ActionDetailViewModel = viewModel(),
+    logId: Long,
+    onBack: () -> Unit,
 ) {
-    val item             by viewModel.item.collectAsState()
-    var snapshotExpanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+    val isPending = logId == 1L
 
-    if (item == null) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Action Detail", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Text(text = "←", fontSize = 20.sp)
-                        }
-                    },
-                )
-            },
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(text = "Action not found")
-            }
-        }
-        return
-    }
-
-    val currentItem = item!!
-
-    val outcomeBgColor = when (currentItem.outcome) {
-        "SUCCESS"                   -> Color(0xFF4CAF50)
-        "FAILURE"                   -> Color(0xFFF44336)
-        "PENDING_USER_CONFIRMATION" -> Color(0xFFFFC107)
-        else                        -> Color(0xFF9E9E9E)
-    }
-    val outcomeLabel = when (currentItem.outcome) {
-        "SUCCESS"                   -> "✓ Success"
-        "FAILURE"                   -> "✗ Failed"
-        "PENDING_USER_CONFIRMATION" -> "⏳ Awaiting confirmation"
-        else                        -> "— Skipped"
-    }
-
-    val situationBullets = listOf(
-        "🔋  Battery: 62%, not charging",
-        "📍  Location: Inferred as 'Office' (WiFi: CorpNet-5G)",
-        "🕑  Time: 9:55 AM, Tuesday",
-        "📅  Next meeting: Stand-up @ 10:00 AM (Google Meet)",
-        "🎙️  Ambient audio: Quiet (office background noise)",
-    )
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Action Detail", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Text(text = "←", fontSize = 20.sp)
-                    }
-                },
-            )
-        },
-    ) { paddingValues ->
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = BgDark,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 24.dp)
+                .padding(top = 24.dp)
+                .verticalScroll(rememberScrollState()),
         ) {
-
             Row(
-                modifier          = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = TextPrimary,
+                    )
+                }
                 Text(
-                    text       = currentItem.skillName,
-                    style      = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier   = Modifier.weight(1f),
+                    text = "Action Detail",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
                 )
-                AssistChip(
-                    onClick = {},
-                    label   = { Text(outcomeLabel, fontSize = 11.sp) },
-                    colors  = AssistChipDefaults.assistChipColors(
-                        containerColor = outcomeBgColor.copy(alpha = 0.2f),
-                        labelColor     = outcomeBgColor,
-                    ),
-                )
+                Spacer(modifier = Modifier.width(48.dp))
             }
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "DND Setter",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                )
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(SuccessGreen, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Text(
-                text  = currentItem.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                text = "Enabled Do Not Disturb before meeting in 5 min",
+                fontSize = 14.sp,
+                color = TextSecondary,
             )
 
-            Card(
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { snapshotExpanded = !snapshotExpanded },
-                shape  = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
+                    .height(1.dp)
+                    .background(DividerLine)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceCard, RoundedCornerShape(16.dp))
+                    .clickable { expanded = !expanded }
+                    .padding(16.dp),
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier              = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment     = Alignment.CenterVertically,
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Why ContextOS acted",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary,
+                    )
+                    Text(
+                        text = if (expanded) "▴" else "▾",
+                        fontSize = 20.sp,
+                        color = TextSecondary,
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically(),
+                    exit = shrinkVertically(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(top = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            text       = "Why ContextOS acted",
-                            style      = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = if (snapshotExpanded) "▴" else "▾",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    AnimatedVisibility(visible = snapshotExpanded) {
-                        Column(
-                            modifier = Modifier.padding(top = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            situationBullets.forEach { bullet ->
-                                Text(
-                                    text  = bullet,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                                )
+                        listOf(
+                            "Battery: 62%",
+                            "Location: Office",
+                            "Meeting in 5 min",
+                            "DND was off",
+                        ).forEach { bullet ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                Text(text = "•", fontSize = 14.sp, color = TextSecondary)
+                                Text(text = bullet, fontSize = 14.sp, color = TextSecondary)
                             }
                         }
                     }
                 }
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape    = RoundedCornerShape(12.dp),
-                colors   = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        text       = "Timeline",
-                        style      = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+            Spacer(modifier = Modifier.height(24.dp))
 
-                    TimelineStep(
-                        icon  = "🔍",
-                        label = "Triggered",
-                        value = formatTime(currentItem.timestampMs),
-                    )
-                    TimelineStep(
-                        icon  = if (currentItem.wasAutoApproved) "✅" else "⏳",
-                        label = if (currentItem.wasAutoApproved) "Auto-approved" else "Awaiting confirmation",
-                        value = if (currentItem.wasAutoApproved) formatTime(currentItem.timestampMs + 100) else "—",
-                    )
-                    if (currentItem.outcome == "SUCCESS") {
-                        TimelineStep(
-                            icon  = "🎯",
-                            label = "Completed",
-                            value = formatTime(currentItem.timestampMs + 250),
-                        )
-                    }
-                }
-            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(DividerLine)
+            )
 
-            if (currentItem.outcome == "PENDING_USER_CONFIRMATION") {
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Button(
-                        onClick  = { viewModel.approve() },
-                        modifier = Modifier.weight(1f),
-                        colors   = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4CAF50),
-                            contentColor   = Color.White,
-                        ),
-                    ) {
-                        Text(text = "✓", fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Approve")
-                    }
-                    OutlinedButton(
-                        onClick  = { viewModel.dismiss() },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Dismiss")
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Timeline",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary,
+                letterSpacing = 1.sp,
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceCard, RoundedCornerShape(16.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TimelineStep(
+                    color = IndigoBase,
+                    label = "Triggered",
+                    time = "9:55",
+                )
+                TimelineStep(
+                    color = IndigoBase,
+                    label = "Approved",
+                    time = "9:55",
+                )
+                TimelineStep(
+                    color = SuccessGreen,
+                    label = "Completed",
+                    time = "9:55",
+                )
+            }
+
+            if (isPending) {
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    androidx.compose.material3.Button(
+                        onClick = { /* TODO */ },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = SuccessGreen,
+                            contentColor = Color.White,
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Text(text = "Approve", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    }
+                    OutlinedButton(
+                        onClick = { /* TODO */ },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, OutlineStroke),
+                    ) {
+                        Text(text = "Dismiss", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = TextSecondary)
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun TimelineStep(icon: String, label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center,
+private fun TimelineStep(color: Color, label: String, time: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(text = icon, fontSize = 14.sp)
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text  = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(color, CircleShape),
             )
-            Text(
-                text       = value,
-                style      = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Text(text = label, fontSize = 14.sp, color = TextPrimary)
         }
+        Text(text = time, fontSize = 14.sp, color = TextTertiary)
     }
 }
-
-private fun formatTime(ms: Long): String =
-    SimpleDateFormat("hh:mm:ss a", Locale.getDefault()).format(Date(ms))

@@ -15,6 +15,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,17 +30,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,28 +62,49 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.contextos.app.ui.theme.BgDark
+import com.contextos.app.ui.theme.BgGradientEnd
+import com.contextos.app.ui.theme.DividerLine
 import com.contextos.app.ui.theme.IndigoBase
+import com.contextos.app.ui.theme.OutlineStroke
+import com.contextos.app.ui.theme.SurfaceCard
+import com.contextos.app.ui.theme.SurfaceInput
+import com.contextos.app.ui.theme.TextPrimary
+import com.contextos.app.ui.theme.TextSecondary
+import com.contextos.app.ui.theme.TextTertiary
 
-import com.contextos.app.ui.theme.IndigoDark
-import com.contextos.app.ui.theme.IndigoLight
-import com.contextos.app.ui.theme.TealAccent
+data class PermissionItem(
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val title: String,
+    val description: String,
+    val permission: String?,
+)
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 1 of 4 — Welcome
-// ─────────────────────────────────────────────────────────────────────────────
+private val REQUIRED_PERMISSIONS = listOf(
+    PermissionItem(Icons.Default.LocationOn, "Location", "Detects home, office, commute",
+        Manifest.permission.ACCESS_FINE_LOCATION),
+    PermissionItem(Icons.Default.Event, "Calendar", "Reads upcoming meetings",
+        Manifest.permission.READ_CALENDAR),
+    PermissionItem(Icons.Default.Notifications, "Notifications", "Action confirm",
+        Manifest.permission.POST_NOTIFICATIONS),
+    PermissionItem(Icons.Default.BatteryAlert, "Battery Opt.", "Background running", null),
+    PermissionItem(Icons.Default.Mic, "Microphone", "Meeting detection",
+        Manifest.permission.RECORD_AUDIO),
+)
 
 @Composable
 fun WelcomeScreen(onNext: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue  = 1.12f,
+        targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200),
             repeatMode = RepeatMode.Reverse,
@@ -82,130 +112,80 @@ fun WelcomeScreen(onNext: () -> Unit) {
         label = "pulseScale",
     )
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color    = Color.Transparent,
-    ) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(IndigoDark, IndigoBase, IndigoLight),
-                    )
-                ),
+                .background(Brush.verticalGradient(colors = listOf(BgDark, BgGradientEnd))),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 32.dp, vertical = 48.dp),
-                verticalArrangement   = Arrangement.SpaceBetween,
-                horizontalAlignment   = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                Spacer(modifier = Modifier.height(64.dp))
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Animated logo
                 Box(
+                    modifier = Modifier
+                        .size(128.dp)
+                        .scale(pulseScale)
+                        .background(IndigoBase.copy(alpha = 0.1f), CircleShape)
+                        .border(4.dp, IndigoBase, CircleShape),
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(140.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .scale(pulseScale)
-                            .background(
-                                color = Color.White.copy(alpha = 0.15f),
-                                shape = CircleShape,
-                            )
-                    )
-                    CircularProgressIndicator(
-                        modifier  = Modifier.size(120.dp).scale(pulseScale),
-                        color     = TealAccent.copy(alpha = 0.7f),
-                        strokeWidth = 3.dp,
-                    )
-                    Text(
-                        text     = "⚡",
-                        fontSize = 48.sp,
+                    Icon(
+                        imageVector = Icons.Default.PhoneAndroid,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = IndigoBase,
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(40.dp))
 
-                // Titles
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text      = "ContextOS",
-                        style     = MaterialTheme.typography.displayMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color     = Color.White,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text      = "Your proactive phone orchestrator",
-                        style     = MaterialTheme.typography.titleMedium,
-                        color     = Color.White.copy(alpha = 0.85f),
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text      = "ContextOS watches your context 24/7 and quietly takes\n" +
-                                    "the right actions — before you even think to ask.",
-                        style     = MaterialTheme.typography.bodyMedium,
-                        color     = Color.White.copy(alpha = 0.65f),
-                        textAlign = TextAlign.Center,
-                    )
-                }
+                Text(
+                    text = "ContextOS",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                    letterSpacing = (-0.5).sp,
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "Your proactive phone\norchestrator",
+                    fontSize = 16.sp,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center,
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "ContextOS watches your context 24/7 and quietly takes the right actions.",
+                    fontSize = 13.sp,
+                    color = TextTertiary,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // CTA
                 Button(
-                    onClick  = onNext,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor   = IndigoDark,
-                    ),
+                    onClick = onNext,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = IndigoBase, contentColor = Color.White),
                     shape = RoundedCornerShape(16.dp),
                 ) {
-                    Text(
-                        text      = "Get Started",
-                        style     = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    Text(text = "Get Started", fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 2 of 4 — Permissions
-// ─────────────────────────────────────────────────────────────────────────────
-
-private data class PermissionItem(
-    val emoji: String,
-    val title: String,
-    val reason: String,
-    val permission: String?,
-)
-
-private val REQUIRED_PERMISSIONS = listOf(
-    PermissionItem("📍", "Location", "Detects home, office, and commute context",
-        Manifest.permission.ACCESS_FINE_LOCATION),
-    PermissionItem("📅", "Calendar", "Reads upcoming meetings to trigger smart reminders",
-        Manifest.permission.READ_CALENDAR),
-    PermissionItem("🎙️", "Microphone", "Detects if you're in a meeting (audio level only)",
-        Manifest.permission.RECORD_AUDIO),
-    PermissionItem("🔔", "Notifications", "Shows action confirmations and status updates",
-        Manifest.permission.POST_NOTIFICATIONS),
-    PermissionItem("🔋", "Battery Optimization", "Keeps ContextOS running in the background",
-        null /* handled via Settings intent */),
-)
 
 @Composable
 fun PermissionsScreen(onNext: () -> Unit) {
@@ -218,62 +198,62 @@ fun PermissionsScreen(onNext: () -> Unit) {
         onNext()
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color    = MaterialTheme.colorScheme.background,
-    ) {
+    Surface(modifier = Modifier.fillMaxSize(), color = BgDark) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp).verticalScroll(rememberScrollState()),
         ) {
             Spacer(modifier = Modifier.height(24.dp))
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "Permissions", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                IconButton(onClick = onNext) {
+                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
-                text      = "Permissions",
-                style     = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color     = MaterialTheme.colorScheme.onBackground,
-            )
-            Text(
-                text  = "ContextOS needs these to understand your context. " +
-                        "All data stays on-device.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                text = "ContextOS needs these to understand your context. All data stays on-device.",
+                fontSize = 14.sp,
+                color = TextSecondary,
+                lineHeight = 20.sp,
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            REQUIRED_PERMISSIONS.forEach { item ->
-                PermissionCard(item = item)
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(DividerLine))
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                REQUIRED_PERMISSIONS.forEach { item ->
+                    PermissionCard(item = item)
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick  = { launcher.launch(permissionsToRequest) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                onClick = { launcher.launch(permissionsToRequest) },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = IndigoBase, contentColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
             ) {
-                Text(
-                    text      = "Grant Permissions",
-                    style     = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-
-            TextButton(
-                onClick  = onNext,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Skip for now", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                Text(text = "Grant Permissions", fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            TextButton(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
+                Text(text = "Skip for now", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextTertiary)
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -281,7 +261,6 @@ fun PermissionsScreen(onNext: () -> Unit) {
 private fun requestBatteryOptimizationExemption(context: Context) {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     if (powerManager.isIgnoringBatteryOptimizations(context.packageName)) return
-
     val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
         data = Uri.parse("package:${context.packageName}")
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -291,266 +270,241 @@ private fun requestBatteryOptimizationExemption(context: Context) {
 
 @Composable
 private fun PermissionCard(item: PermissionItem) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(12.dp),
-        colors   = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+    Row(
+        modifier = Modifier.fillMaxWidth().background(SurfaceCard, RoundedCornerShape(16.dp)).padding(16.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier.size(48.dp).background(IndigoBase, CircleShape),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(text = item.emoji, fontSize = 22.sp)
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text      = item.title,
-                    style     = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text  = item.reason,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                )
-            }
+            Icon(imageVector = item.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+        }
+        Column {
+            Text(text = item.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = item.description, fontSize = 14.sp, color = TextSecondary)
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 3 of 4 — Google Sign-In
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
-fun GoogleSignInScreen(
-    onSignIn: () -> Unit,
-    onSkip:   () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color    = MaterialTheme.colorScheme.background,
-    ) {
+fun GoogleSignInScreen(onSignIn: () -> Unit, onSkip: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxSize(), color = BgDark) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 48.dp),
-            verticalArrangement   = Arrangement.Center,
-            horizontalAlignment   = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Google "G" badge
+            Spacer(modifier = Modifier.height(120.dp))
+
             Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                modifier = Modifier.size(80.dp).border(2.dp, OutlineStroke, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text       = "G",
-                    fontSize   = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = Color(0xFF4285F4),
-                )
+                Icon(imageVector = Icons.Default.Email, contentDescription = null, modifier = Modifier.size(36.dp), tint = TextPrimary)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
-                text       = "Connect your Google account",
-                style      = MaterialTheme.typography.headlineSmall,
+                text = "Connect your Google\naccount",
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                textAlign  = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text      = "Syncs Calendar, Gmail, and Drive for proactive assistance — " +
-                            "read-only access, revokable at any time.",
-                style     = MaterialTheme.typography.bodyMedium,
+                color = TextPrimary,
                 textAlign = TextAlign.Center,
-                color     = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Syncs Calendar, Gmail, and Drive for proactive assistance. Read-only access, revokable.",
+                fontSize = 14.sp,
+                color = TextSecondary,
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp,
+                modifier = Modifier.padding(horizontal = 8.dp),
             )
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Feature bullets
-            listOf(
-                "📅  Calendar — smart meeting reminders & DND",
-                "📧  Gmail — draft replies when you're unreachable",
-                "📁  Drive — surface docs before your next meeting",
-            ).forEach { feature ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(IndigoBase, CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text  = feature,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+            Column(modifier = Modifier.padding(horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                listOf(
+                    "Calendar — smart meeting reminders & DND",
+                    "Gmail — draft replies when unreachable",
+                    "Drive — surface docs before meetings",
+                ).forEach { feature ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(text = "•", fontSize = 14.sp, color = IndigoBase, modifier = Modifier.padding(top = 2.dp))
+                        Text(text = feature, fontSize = 14.sp, color = TextPrimary)
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
             OutlinedButton(
-                onClick  = onSignIn,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape  = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    2.dp, MaterialTheme.colorScheme.primary
-                ),
+                onClick = onSignIn,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(2.dp, IndigoBase),
             ) {
-                Text(
-                    text      = "Sign in with Google",
-                    style     = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Text(text = "Sign in with Google", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = IndigoBase)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            TextButton(onClick = onSkip) {
-                Text(
-                    text  = "Skip for now",
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                )
+            TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) {
+                Text(text = "Skip for now", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextTertiary)
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 4 of 4 — Emergency Contact
-// ─────────────────────────────────────────────────────────────────────────────
-
-private val RELATIONSHIP_OPTIONS = listOf("Family", "Friend", "Colleague", "Doctor")
+private val RELATIONSHIP_OPTIONS = listOf("Family", "Friend", "Work", "Doctor")
 
 @Composable
 fun EmergencyContactScreen(
     onNext: () -> Unit,
     onSaveContact: (name: String, phone: String, relationship: String) -> Unit = { _, _, _ -> },
 ) {
-    var name         by remember { mutableStateOf("") }
-    var phone        by remember { mutableStateOf("") }
-    var relationship by remember { mutableStateOf("Family") }
-    var phoneError   by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var relationship by remember { mutableStateOf("") }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color    = MaterialTheme.colorScheme.background,
-    ) {
+    val isValid = name.trim().isNotEmpty() && phone.trim().isNotEmpty() && relationship.isNotEmpty()
+
+    Surface(modifier = Modifier.fillMaxSize(), color = BgDark) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp)
+            modifier = Modifier.fillMaxSize()
+                .padding(horizontal = 32.dp)
+                .padding(top = 32.dp, bottom = 32.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Text(text = "Emergency Contact", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Who should ContextOS contact if it detects you might need help?",
+                fontSize = 14.sp,
+                color = TextSecondary,
+                lineHeight = 20.sp,
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text      = "Emergency Contact",
-                style     = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text  = "Who should ContextOS contact if it detects you might need help?",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value         = name,
-                onValueChange = { name = it },
-                label         = { Text("Full name") },
-                singleLine    = true,
-                modifier      = Modifier.fillMaxWidth(),
-            )
-
-            OutlinedTextField(
-                value         = phone,
-                onValueChange = {
-                    phone = it
-                    phoneError = it.isNotEmpty() && !it.matches(Regex("[0-9+\\-() ]{7,15}"))
-                },
-                label         = { Text("Phone number") },
-                isError       = phoneError,
-                supportingText = if (phoneError) {
-                    { Text("Enter a valid phone number") }
-                } else null,
-                singleLine    = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                modifier      = Modifier.fillMaxWidth(),
-            )
-
-            Text(
-                text  = "Relationship",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RELATIONSHIP_OPTIONS.forEach { option ->
-                    FilterChip(
-                        selected = relationship == option,
-                        onClick  = { relationship = option },
-                        label    = { Text(option) },
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column {
+                    Text(
+                        text = "Full name",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextSecondary,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    BasicTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                            .background(SurfaceInput, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = TextPrimary),
+                        singleLine = true,
+                        cursorBrush = SolidColor(IndigoBase),
+                        decorationBox = { innerTextField ->
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                                if (name.isEmpty()) Text(text = "John Doe", fontSize = 16.sp, color = TextTertiary)
+                                innerTextField()
+                            }
+                        },
                     )
                 }
+
+                Column {
+                    Text(
+                        text = "Phone number",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextSecondary,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    BasicTextField(
+                        value = phone,
+                        onValueChange = { phone = it },
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                            .background(SurfaceInput, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = TextPrimary),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        cursorBrush = SolidColor(IndigoBase),
+                        decorationBox = { innerTextField ->
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                                if (phone.isEmpty()) Text(text = "+1 555 0123", fontSize = 16.sp, color = TextTertiary)
+                                innerTextField()
+                            }
+                        },
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = "Relationship",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextSecondary,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        RELATIONSHIP_OPTIONS.forEach { rel ->
+                            val selected = relationship == rel
+                            FilterChip(
+                                selected = selected,
+                                onClick = { relationship = rel },
+                                label = { Text(text = rel, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = if (selected) IndigoBase else SurfaceInput,
+                                    labelColor = if (selected) Color.White else TextSecondary,
+                                    selectedContainerColor = IndigoBase,
+                                    selectedLabelColor = Color.White,
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = {
+                    onSaveContact(name, phone, relationship)
+                    onNext()
+                },
+                enabled = isValid,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isValid) IndigoBase else DividerLine,
+                    contentColor = if (isValid) Color.White else TextTertiary,
+                ),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Text(text = "Save & Continue", fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick  = {
-                    if (!phoneError) {
-                        onSaveContact(name, phone, relationship)
-                        onNext()
-                    }
-                },
-                enabled  = name.isNotBlank() && phone.isNotBlank() && !phoneError,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-            ) {
-                Text(
-                    text      = "Save & Continue",
-                    style     = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-
-            TextButton(
-                onClick  = onNext,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text  = "Skip",
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                )
+            TextButton(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
+                Text(text = "Skip", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextTertiary)
             }
         }
     }

@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import com.contextos.app.ui.navigation.ContextOSNavGraph
-import com.contextos.app.ui.navigation.Screen
 import com.contextos.app.ui.navigation.StartDestinationViewModel
 import com.contextos.app.ui.theme.ContextOSTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -24,10 +23,10 @@ class MainActivity : ComponentActivity() {
             ContextOSTheme {
                 val navController = rememberNavController()
                 val viewModel: StartDestinationViewModel = viewModel()
-                val startDestination by viewModel.startDestination.collectAsState(Screen.Onboarding.Welcome.route)
+                val startDestination by viewModel.startDestination.collectAsState()
 
                 ContextOSNavGraph(
-                    navController    = navController,
+                    navController = navController,
                     startDestination = startDestination,
                 )
             }
