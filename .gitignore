@@ -103,3 +103,5 @@ libs/*.so
 # Secrets and environment variables
 .env
 .env.*
+
+env.sh
