@@ -4,6 +4,7 @@ import android.util.Log
 import com.contextos.core.service.SensorDataCollector
 import com.contextos.core.service.ServiceHealthMonitor
 import com.contextos.core.service.SituationModelBuilder
+import com.contextos.core.skills.Skill
 import com.contextos.core.skills.SkillRegistry
 import com.contextos.core.skills.SkillResult
 import kotlinx.coroutines.CancellationException
@@ -78,16 +79,24 @@ class ContextAgent @Inject constructor(
         }
 
         // Step 3 — Evaluate and execute triggered skills
-        val triggeredSkills = skillRegistry.skills.filter { skill ->
+        val allSkills = skillRegistry.skills
+        val triggeredSkills = mutableListOf<Skill>()
+        val dismissedSkills = mutableListOf<Pair<Skill, String>>()
+
+        for (skill in allSkills) {
             try {
-                skill.shouldTrigger(model)
+                if (skill.shouldTrigger(model)) {
+                    triggeredSkills.add(skill)
+                } else {
+                    dismissedSkills.add(Pair(skill, "Skill '${skill.id}' did not trigger"))
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "shouldTrigger() threw for skill '${skill.id}'", e)
-                false
+                dismissedSkills.add(Pair(skill, "Evaluation error: ${e.message}"))
             }
         }
 
-        Log.i(TAG, "Cycle: ${triggeredSkills.size} skill(s) triggered")
+        Log.i(TAG, "Cycle: ${triggeredSkills.size} skill(s) triggered, ${dismissedSkills.size} dismissed")
 
         // Step 4 — Execute triggered skills (sequential to avoid parallel DB writes)
         for (skill in triggeredSkills) {
@@ -99,7 +108,17 @@ class ContextAgent @Inject constructor(
                 Log.e(TAG, "Skill '${skill.id}' threw during execute()", e)
                 SkillResult.Failure("Unexpected error in ${skill.id}: ${e.message}", e)
             }
-            dispatcher.dispatch(skill, result, model)
+            dispatcher.dispatch(skill, result, model, confidence = 0.85f)
+        }
+
+        // Step 4b — Log dismissed skills with reasoning (collapsed by default in UI)
+        for ((skill, reason) in dismissedSkills) {
+            dispatcher.dispatch(
+                skill = skill,
+                result = SkillResult.Skipped(reason),
+                model = model,
+                confidence = 0.30f,
+            )
         }
 
         // Step 5 — Record cycle & periodic heartbeat

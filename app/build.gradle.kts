@@ -8,6 +8,7 @@ val localProperties = Properties().apply {
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
@@ -109,6 +110,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
+    // Coroutines
+    implementation(libs.kotlinx.coroutines.android)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
@@ -120,4 +124,7 @@ dependencies {
     implementation(project(":core:skills"))
     implementation(project(":core:network"))
     implementation(project(":core:memory"))
+
+    // Serialization
+    implementation(libs.kotlinx.serialization.json)
 }

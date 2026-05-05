@@ -43,8 +43,9 @@ class SituationModelBuilder @Inject constructor(
         val nextEvent     = upcomingEntities.firstOrNull()?.toSummary()
         val upcomingEvents = upcomingEntities.take(5).map { it.toSummary() }
 
-        val locationLabel = if (raw.location != null) {
-            locationMemoryManager.getLabelForLocation(raw.location.latitude, raw.location.longitude)
+        val location = raw.location
+        val locationLabel = if (location != null) {
+            locationMemoryManager.getLabelForLocation(location.latitude, location.longitude)
         } else "Unknown"
 
         val calendar = Calendar.getInstance().apply { timeInMillis = raw.timestampMs }
@@ -57,8 +58,8 @@ class SituationModelBuilder @Inject constructor(
         val memorySummary = memorySummaryBuilder.build(
             dayOfWeek = dayOfWeek,
             timeSlot  = timeSlot,
-            latitude  = raw.location?.latitude,
-            longitude = raw.location?.longitude,
+            latitude  = location?.latitude,
+            longitude = location?.longitude,
         )
 
         val baseModel = SituationModel(
