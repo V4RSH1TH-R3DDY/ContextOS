@@ -99,3 +99,7 @@ coverage/
 # NDK
 obj/
 libs/*.so
+
+# Secrets and environment variables
+.env
+.env.*

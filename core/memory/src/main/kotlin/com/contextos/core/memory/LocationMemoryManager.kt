@@ -26,7 +26,46 @@ class LocationMemoryManager @Inject constructor(
      * @param longitude WGS-84 longitude of the observed position.
      */
     suspend fun recordVisit(latitude: Double, longitude: Double) {
-        TODO("Phase 3.4 — LocationMemoryManager.recordVisit()")
+        val latLngHash = String.format(java.util.Locale.US, "%.3f,%.3f", latitude, longitude)
+        val existing = dao.getByHash(latLngHash)
+        val now = System.currentTimeMillis()
+        
+        val calendar = java.util.Calendar.getInstance()
+        calendar.timeInMillis = now
+        val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+        val dayOfWeek = calendar.get(java.util.Calendar.DAY_OF_WEEK)
+        val isWeekday = dayOfWeek in java.util.Calendar.MONDAY..java.util.Calendar.FRIDAY
+
+        if (existing != null) {
+            val newVisitCount = existing.visitCount + 1
+            var newLabel = existing.inferredLabel
+            if (newVisitCount >= 5) {
+                if (isWeekday && hour in 9..17) {
+                    newLabel = "Office"
+                } else if (hour >= 20 || hour <= 8) {
+                    newLabel = "Home"
+                } else if (newVisitCount >= 10 && newLabel == "Unknown") {
+                    newLabel = "Frequent Location"
+                }
+            }
+            
+            dao.upsert(existing.copy(
+                visitCount = newVisitCount,
+                inferredLabel = newLabel,
+                lastVisitedMs = now
+            ))
+        } else {
+            dao.upsert(LocationMemoryEntity(
+                latLngHash = latLngHash,
+                centerLatitude = latitude,
+                centerLongitude = longitude,
+                inferredLabel = "Unknown",
+                visitCount = 1,
+                typicalArrivalTime = null,
+                typicalDepartureTime = null,
+                lastVisitedMs = now
+            ))
+        }
     }
 
     /**
@@ -38,7 +77,9 @@ class LocationMemoryManager @Inject constructor(
      * @return Human-readable label, or "Unknown" if no cluster matches.
      */
     suspend fun getLabelForLocation(latitude: Double, longitude: Double): String {
-        TODO("Phase 3.4 — LocationMemoryManager.getLabelForLocation()")
+        val latLngHash = String.format(java.util.Locale.US, "%.3f,%.3f", latitude, longitude)
+        val entity = dao.getByHash(latLngHash)
+        return entity?.inferredLabel ?: "Unknown"
     }
 
     /**

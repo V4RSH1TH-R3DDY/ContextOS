@@ -17,6 +17,7 @@ data class SituationModel(
     val locationLabel: String = "Unknown",
     val wifiSsid: String? = null,
     val isMobileDataConnected: Boolean = false,
+    val analysis: SituationAnalysis? = null,
 )
 
 @Serializable

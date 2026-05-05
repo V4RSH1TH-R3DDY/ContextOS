@@ -2,6 +2,8 @@ package com.contextos.core.memory
 
 import com.contextos.core.data.db.dao.PreferenceMemoryDao
 import com.contextos.core.data.db.dao.UserPreferenceDao
+import com.contextos.core.data.db.entity.PreferenceMemoryEntity
+import com.contextos.core.data.db.entity.UserPreferenceEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,7 +30,37 @@ class PreferenceMemoryManager @Inject constructor(
      * @param choice      "APPROVED" or "DISMISSED".
      */
     suspend fun recordUserChoice(skillId: String, contextHash: String, choice: String) {
-        TODO("Phase 3.3 — PreferenceMemoryManager.recordUserChoice()")
+        val existing = dao.getBySkillAndContext(skillId, contextHash)
+        val now = System.currentTimeMillis()
+        if (existing != null) {
+            val isSameChoice = existing.userChoice == choice
+            val updated = if (isSameChoice) {
+                existing.copy(frequency = existing.frequency + 1, lastObservedMs = now)
+            } else {
+                existing.copy(userChoice = choice, frequency = 1, lastObservedMs = now)
+            }
+            dao.upsert(updated)
+            
+            // Check if we should update autoApprove (3+ consistent approvals)
+            if (updated.userChoice == "APPROVED" && updated.frequency >= 3) {
+                val pref = userPrefDao.getBySkillId(skillId)
+                if (pref != null) {
+                    if (!pref.autoApprove) {
+                        userPrefDao.upsert(pref.copy(autoApprove = true))
+                    }
+                } else {
+                    userPrefDao.upsert(UserPreferenceEntity(skillId = skillId, autoApprove = true))
+                }
+            }
+        } else {
+            dao.upsert(PreferenceMemoryEntity(
+                skillId = skillId,
+                contextHash = contextHash,
+                userChoice = choice,
+                frequency = 1,
+                lastObservedMs = now
+            ))
+        }
     }
 
     /**
@@ -41,7 +73,12 @@ class PreferenceMemoryManager @Inject constructor(
      * @param contextHash SHA-256 hash of the relevant SituationModel fields.
      */
     suspend fun shouldAutoApprove(skillId: String, contextHash: String): Boolean {
-        TODO("Phase 3.3 — PreferenceMemoryManager.shouldAutoApprove()")
+        val userPref = userPrefDao.getBySkillId(skillId)
+        if (userPref != null && userPref.autoApprove) {
+            return true
+        }
+        val memory = dao.getBySkillAndContext(skillId, contextHash)
+        return memory != null && memory.userChoice == "APPROVED" && memory.frequency >= 3
     }
 
     /**

@@ -109,7 +109,7 @@ class ContextAgent @Inject constructor(
         }
 
         Log.i(TAG, "✔ Cycle ${healthMonitor.getCycleCount()} complete " +
-                "(battery=${model.batteryLevel}%, location=${model.locationLabel})")
+                "(battery=${model.batteryLevel}%, location=${model.locationLabel}, context=${model.analysis?.currentContextLabel ?: "Unknown"})")
     }
 
     // ─────────────────────────────────────────────────────────────────────────

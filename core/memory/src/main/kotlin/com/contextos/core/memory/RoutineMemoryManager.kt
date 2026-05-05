@@ -27,7 +27,41 @@ class RoutineMemoryManager @Inject constructor(
      * @param activity   Human-readable activity label (e.g., "commuting", "meeting").
      */
     suspend fun recordObservation(dayOfWeek: Int, timeSlotMs: Long, activity: String) {
-        TODO("Phase 3.2 — Routine Memory System")
+        val calendar = java.util.Calendar.getInstance()
+        calendar.timeInMillis = timeSlotMs
+        val minutes = calendar.get(java.util.Calendar.MINUTE)
+        val roundedMinutes = if (minutes < 30) 0 else 30
+        val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+        val timeSlot = String.format("%02d:%02d", hour, roundedMinutes)
+
+        val existing = dao.getByDayAndSlot(dayOfWeek, timeSlot)
+        if (existing != null) {
+            val newCount = existing.observationCount + 1
+            val isSameActivity = existing.expectedActivity == activity
+            val newConfidence = if (isSameActivity) {
+                minOf(1.0f, existing.confidence + 0.1f)
+            } else {
+                maxOf(0.1f, existing.confidence - 0.2f)
+            }
+            val newActivity = if (newConfidence < 0.4f) activity else existing.expectedActivity
+            val updated = existing.copy(
+                expectedActivity = newActivity,
+                confidence = newConfidence,
+                observationCount = newCount,
+                lastObservedMs = timeSlotMs
+            )
+            dao.upsert(updated)
+        } else {
+            val entity = RoutineMemoryEntity(
+                dayOfWeek = dayOfWeek,
+                timeSlot = timeSlot,
+                expectedActivity = activity,
+                confidence = 0.3f, // Initial confidence
+                observationCount = 1,
+                lastObservedMs = timeSlotMs
+            )
+            dao.upsert(entity)
+        }
     }
 
     /**
@@ -39,7 +73,11 @@ class RoutineMemoryManager @Inject constructor(
      * @return Pair of (activity label, confidence in [0, 1]) or null.
      */
     suspend fun getPredictedActivity(dayOfWeek: Int, timeSlot: String): Pair<String, Float>? {
-        TODO("Phase 3.2 — Routine Memory System")
+        val entity = dao.getByDayAndSlot(dayOfWeek, timeSlot)
+        if (entity != null && entity.confidence >= 0.5f) {
+            return Pair(entity.expectedActivity, entity.confidence)
+        }
+        return null
     }
 
     /**

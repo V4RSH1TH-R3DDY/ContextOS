@@ -2,6 +2,7 @@ package com.contextos.core.skills.di
 
 import com.contextos.core.skills.BatteryWarnerSkill
 import com.contextos.core.skills.DndSetterSkill
+import com.contextos.core.skills.LocationIntelligenceSkill
 import com.contextos.core.skills.NavigationLauncherSkill
 import com.contextos.core.skills.PhaseOneHeartbeatSkill
 import com.contextos.core.skills.Skill
@@ -40,4 +41,8 @@ abstract class SkillsModule {
     @Binds
     @IntoSet
     abstract fun bindNavigationLauncherSkill(skill: NavigationLauncherSkill): Skill
+
+    @Binds
+    @IntoSet
+    abstract fun bindLocationIntelligenceSkill(skill: LocationIntelligenceSkill): Skill
 }
