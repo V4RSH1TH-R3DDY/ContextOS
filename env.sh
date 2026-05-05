@@ -4,7 +4,7 @@
 
 # ── Gemini API Configuration ──────────────────────────────────────────────────
 export OPENCLAW_API_ENDPOINT="https://generativelanguage.googleapis.com/v1beta/models"
-export OPENCLAW_API_KEY="AIzaSyCBxXOpVd2nCcTVlmsp1TkDWH9bINouUIE"
+export OPENCLAW_API_KEY="your gemini i key"
 
 # ── Gemini Models ─────────────────────────────────────────────────────────────
 export OPENCLAW_REASONING_MODEL="gemini-2.0-flash"
