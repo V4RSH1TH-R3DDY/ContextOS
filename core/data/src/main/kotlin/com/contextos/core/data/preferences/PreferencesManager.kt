@@ -22,6 +22,7 @@ class PreferencesManager(
     private val KEY_EMERGENCY_CONTACT_PHONE = stringPreferencesKey("emergency_contact_phone")
     private val KEY_EMERGENCY_CONTACT_RELATIONSHIP = stringPreferencesKey("emergency_contact_relationship")
     private val KEY_GOOGLE_ACCOUNT_EMAIL = stringPreferencesKey("google_account_email")
+    private val KEY_DEMO_MODE = booleanPreferencesKey("demo_mode")
 
     // Onboarding
     val isOnboardingComplete: Flow<Boolean> = context.dataStore.data
@@ -78,5 +79,13 @@ class PreferencesManager(
                 it.remove(KEY_GOOGLE_ACCOUNT_EMAIL)
             }
         }
+    }
+
+    // Demo mode
+    val isDemoMode: Flow<Boolean> = context.dataStore.data
+        .map { it[KEY_DEMO_MODE] ?: false }
+
+    suspend fun setDemoMode(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_DEMO_MODE] = enabled }
     }
 }

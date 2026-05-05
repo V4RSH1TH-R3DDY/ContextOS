@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    ContextOS base theme.
-    The actual visual theme is handled by Jetpack Compose (ContextOSTheme).
-    This XML theme is required by the Activity and Application elements in the manifest.
-    It extends Theme.Material3.DayNight.NoActionBar so the Compose surface fills the window.
--->
 <resources>
-    <style name="Theme.ContextOS" parent="android:Theme.Material.Light.NoActionBar">
-        <!-- Status bar is controlled by WindowCompat / Compose side-effect in Theme.kt -->
+    <style name="Theme.ContextOS" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#050508</item>
         <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>

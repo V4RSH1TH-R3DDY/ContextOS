@@ -4,8 +4,10 @@ import android.util.Log
 import com.contextos.core.data.db.dao.UserPreferenceDao
 import com.contextos.core.data.db.entity.ActionLogEntity
 import com.contextos.core.data.model.ActionOutcome
+import com.contextos.core.data.model.ReasoningPayload
 import com.contextos.core.data.model.SituationModel
 import com.contextos.core.data.repository.ActionLogRepository
+import com.contextos.core.service.ReasoningBuilder
 import com.contextos.core.skills.Skill
 import com.contextos.core.skills.SkillResult
 import kotlinx.serialization.encodeToString
@@ -29,6 +31,7 @@ class ActionDispatcher @Inject constructor(
 ) {
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val reasoningBuilder = ReasoningBuilder()
 
     // ─────────────────────────────────────────────────────────────────────────
     // Public API
@@ -44,10 +47,12 @@ class ActionDispatcher @Inject constructor(
         skill:  Skill,
         result: SkillResult,
         model:  SituationModel,
+        confidence: Float = 0.85f,
     ) {
         val prefs          = userPreferenceDao.getBySkillId(skill.id)
         val autoApprove    = prefs?.autoApprove ?: false
         val situationJson  = serializeSituation(model)
+        val reasoningJson  = serializeReasoning(reasoningBuilder.buildReasoningPayload(model, skill.id, confidence))
         val nowMs          = System.currentTimeMillis()
 
         when (result) {
@@ -60,6 +65,7 @@ class ActionDispatcher @Inject constructor(
                     outcome          = ActionOutcome.SUCCESS,
                     wasAutoApproved  = true,
                     situationJson    = situationJson,
+                    reasoningJson    = reasoningJson,
                 )
             }
 
@@ -73,7 +79,7 @@ class ActionDispatcher @Inject constructor(
                         Log.e(TAG, "[${skill.id}] Auto-approved action failed", e)
                         SkillResult.Failure("Auto-approval failed: ${e.message}", e)
                     }
-                    dispatch(skill, innerResult, model)  // recurse with the real result
+                    dispatch(skill, innerResult, model, confidence)  // recurse with the real result
                 } else {
                     Log.i(TAG, "[${skill.id}] Pending user confirmation — ${result.confirmationMessage}")
                     log(
@@ -83,6 +89,7 @@ class ActionDispatcher @Inject constructor(
                         outcome          = ActionOutcome.PENDING_USER_CONFIRMATION,
                         wasAutoApproved  = false,
                         situationJson    = situationJson,
+                        reasoningJson    = reasoningJson,
                     )
                 }
             }
@@ -96,6 +103,7 @@ class ActionDispatcher @Inject constructor(
                     outcome          = ActionOutcome.FAILURE,
                     wasAutoApproved  = true,
                     situationJson    = situationJson,
+                    reasoningJson    = reasoningJson,
                 )
             }
 
@@ -108,6 +116,7 @@ class ActionDispatcher @Inject constructor(
                     outcome          = ActionOutcome.SKIPPED,
                     wasAutoApproved  = true,
                     situationJson    = situationJson,
+                    reasoningJson    = reasoningJson,
                 )
             }
         }
@@ -124,6 +133,7 @@ class ActionDispatcher @Inject constructor(
         outcome:         ActionOutcome,
         wasAutoApproved: Boolean,
         situationJson:   String,
+        reasoningJson:   String = "{}",
     ) {
         try {
             actionLogRepository.insert(
@@ -135,6 +145,7 @@ class ActionDispatcher @Inject constructor(
                     wasAutoApproved   = wasAutoApproved,
                     userOverride      = null,
                     situationSnapshot = situationJson,
+                    reasoningPayload  = reasoningJson,
                     outcome           = outcome.name,
                 )
             )
@@ -148,6 +159,15 @@ class ActionDispatcher @Inject constructor(
             json.encodeToString(model)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to serialize SituationModel", e)
+            "{}"
+        }
+    }
+
+    private fun serializeReasoning(payload: ReasoningPayload): String {
+        return try {
+            json.encodeToString(payload)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to serialize ReasoningPayload", e)
             "{}"
         }
     }

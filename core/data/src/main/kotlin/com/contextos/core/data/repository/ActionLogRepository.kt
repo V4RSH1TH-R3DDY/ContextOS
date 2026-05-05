@@ -2,7 +2,10 @@ package com.contextos.core.data.repository
 
 import com.contextos.core.data.db.dao.ActionLogDao
 import com.contextos.core.data.db.entity.ActionLogEntity
+import com.contextos.core.data.model.ReasoningPayload
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 /**
@@ -12,6 +15,8 @@ import javax.inject.Inject
 class ActionLogRepository @Inject constructor(
     private val dao: ActionLogDao,
 ) {
+
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     /**
      * Inserts a new [ActionLogEntity] and returns the generated row id.
@@ -45,4 +50,86 @@ class ActionLogRepository @Inject constructor(
 
     suspend fun countDismissalsSince(skillId: String, sinceMs: Long): Int =
         dao.countDismissalsSince(skillId, sinceMs)
+
+    /**
+     * Pre-populates demo reasoning entries for Phase 9.3 demo mode.
+     */
+    suspend fun prePopulateDemoReasoningEntries() {
+        val now = System.currentTimeMillis()
+
+        val demoEntries = listOf(
+            ActionLogEntity(
+                timestampMs = now - 3600000, // 1 hour ago
+                skillId = "navigation_launcher",
+                skillName = "Navigation Launcher",
+                description = "Launching navigation to Acme Corp meeting",
+                wasAutoApproved = false,
+                userOverride = null,
+                situationSnapshot = "{}",
+                reasoningPayload = json.encodeToString(
+                    ReasoningPayload(
+                        contextLabel = "Pre-meeting commute",
+                        confidenceScore = 0.92f,
+                        reasoningPoints = listOf(
+                            "Meeting in 14 mins",
+                            "You are 8 km away",
+                            "Traffic is currently heavy",
+                            "Historical lateness pattern detected"
+                        ),
+                        anomalyFlags = listOf("Meeting in 8 mins but you appear to be 20 km away"),
+                        dataSourcesUsed = listOf("Calendar", "GPS", "Your history")
+                    )
+                ),
+                outcome = "PENDING_USER_CONFIRMATION"
+            ),
+            ActionLogEntity(
+                timestampMs = now - 7200000, // 2 hours ago
+                skillId = "battery_warner",
+                skillName = "Battery Warner",
+                description = "Warning: Battery low before long meeting",
+                wasAutoApproved = true,
+                userOverride = null,
+                situationSnapshot = "{}",
+                reasoningPayload = json.encodeToString(
+                    ReasoningPayload(
+                        contextLabel = "Low battery before long meeting",
+                        confidenceScore = 0.88f,
+                        reasoningPoints = listOf(
+                            "Battery at 18%",
+                            "Long meeting (2 hours) starting in 30 mins",
+                            "No charger nearby detected"
+                        ),
+                        dataSourcesUsed = listOf("Battery", "Calendar")
+                    )
+                ),
+                outcome = "SUCCESS"
+            ),
+            ActionLogEntity(
+                timestampMs = now - 10800000, // 3 hours ago
+                skillId = "dnd_setter",
+                skillName = "DND Setter",
+                description = "Enabling Do Not Disturb for evening commute",
+                wasAutoApproved = true,
+                userOverride = null,
+                situationSnapshot = "{}",
+                reasoningPayload = json.encodeToString(
+                    ReasoningPayload(
+                        contextLabel = "End-of-day commute home",
+                        confidenceScore = 0.79f,
+                        reasoningPoints = listOf(
+                            "Typical commute time: 5:45 PM",
+                            "Location: Office",
+                            "Calendar shows no evening events"
+                        ),
+                        dataSourcesUsed = listOf("Calendar", "GPS", "Your history")
+                    )
+                ),
+                outcome = "SUCCESS"
+            )
+        )
+
+        demoEntries.forEach { entry ->
+            dao.insert(entry)
+        }
+    }
 }

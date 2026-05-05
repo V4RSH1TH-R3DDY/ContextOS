@@ -75,6 +75,7 @@ class ServiceHealthMonitor @Inject constructor(
                     wasAutoApproved  = true,
                     userOverride     = null,
                     situationSnapshot = "{}",
+                    reasoningPayload  = "{}",
                     outcome          = ActionOutcome.SUCCESS.name,
                 )
             )

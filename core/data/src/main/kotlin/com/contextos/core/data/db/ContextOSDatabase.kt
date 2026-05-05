@@ -6,12 +6,14 @@ import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.contextos.core.data.db.dao.ActionLogDao
 import com.contextos.core.data.db.dao.CalendarEventCacheDao
+import com.contextos.core.data.db.dao.ConfirmedRoutineDao
 import com.contextos.core.data.db.dao.LocationMemoryDao
 import com.contextos.core.data.db.dao.PreferenceMemoryDao
 import com.contextos.core.data.db.dao.RoutineMemoryDao
 import com.contextos.core.data.db.dao.UserPreferenceDao
 import com.contextos.core.data.db.entity.ActionLogEntity
 import com.contextos.core.data.db.entity.CalendarEventCacheEntity
+import com.contextos.core.data.db.entity.ConfirmedRoutineEntity
 import com.contextos.core.data.db.entity.LocationMemoryEntity
 import com.contextos.core.data.db.entity.PreferenceMemoryEntity
 import com.contextos.core.data.db.entity.RoutineMemoryEntity
@@ -50,8 +52,9 @@ class Converters {
         RoutineMemoryEntity::class,
         PreferenceMemoryEntity::class,
         LocationMemoryEntity::class,
+        ConfirmedRoutineEntity::class,
     ],
-    version = 1,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -62,4 +65,5 @@ abstract class ContextOSDatabase : RoomDatabase() {
     abstract fun routineMemoryDao(): RoutineMemoryDao
     abstract fun preferenceMemoryDao(): PreferenceMemoryDao
     abstract fun locationMemoryDao(): LocationMemoryDao
+    abstract fun confirmedRoutineDao(): ConfirmedRoutineDao
 }

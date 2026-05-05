@@ -1,9 +1,14 @@
 package com.contextos.app.ui.dashboard
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,7 +19,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -69,6 +73,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
@@ -81,12 +89,18 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.contextos.app.ui.theme.Accent
-import com.contextos.app.ui.theme.AccentDim
+import com.contextos.app.ui.background.RippleGridBackground
 import com.contextos.app.ui.theme.Background
 import com.contextos.app.ui.theme.Border
 import com.contextos.app.ui.theme.BorderLight
 import com.contextos.app.ui.theme.DividerLine
+import com.contextos.app.ui.theme.GlassCard
+import com.contextos.app.ui.theme.GlassOverlay
+import com.contextos.app.ui.theme.NeonBright
+import com.contextos.app.ui.theme.NeonDim
+import com.contextos.app.ui.theme.NeonGlow
+import com.contextos.app.ui.theme.NeonRing
+import com.contextos.app.ui.theme.NeonOrange
 import com.contextos.app.ui.theme.OutlineStroke
 import com.contextos.app.ui.theme.SurfaceBg
 import com.contextos.app.ui.theme.SurfaceCard
@@ -215,6 +229,17 @@ fun DashboardScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Background)) {
+        RippleGridBackground(
+            gridColorHex = "#FF5F1F",
+            rippleIntensity = 0.01f,
+            gridSize = 16f,
+            gridThickness = 16f,
+            fadeDistance = 2f,
+            vignetteStrength = 1f,
+            glowIntensity = 0.04f,
+            opacity = 0.6f,
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -223,7 +248,6 @@ fun DashboardScreen(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            // Top bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -253,7 +277,6 @@ fun DashboardScreen(
                 }
             }
 
-            // Chat messages
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -267,20 +290,28 @@ fun DashboardScreen(
             ) {
                 items(messages, key = { it.id }) { message ->
                     if (message.id == "1" && messages.size <= 2) {
-                        GreetingMessage(message = message)
+                        AiOrbGreeting(message = message)
                     } else {
                         MessageBubble(message = message)
                     }
                 }
             }
 
-            // Input bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .background(SurfaceInput, RoundedCornerShape(24.dp))
-                    .border(1.dp, Border, RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                SurfaceInput.copy(alpha = 0.6f),
+                                SurfaceCard.copy(alpha = 0.4f),
+                                SurfaceInput.copy(alpha = 0.6f),
+                            )
+                        ),
+                        RoundedCornerShape(24.dp),
+                    )
+                    .border(1.dp, BorderLight.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -306,7 +337,7 @@ fun DashboardScreen(
                             }
                         },
                     ),
-                    cursorBrush = SolidColor(Accent),
+                    cursorBrush = SolidColor(NeonOrange),
                     decorationBox = { innerTextField ->
                         Box(
                             modifier = Modifier.fillMaxWidth(),
@@ -323,43 +354,28 @@ fun DashboardScreen(
                         }
                     },
                 )
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .background(
-                            if (input.value.isNotBlank()) Accent else Border,
-                            CircleShape,
-                        )
-                        .clickable(enabled = input.value.isNotBlank()) {
-                            if (input.value.isNotBlank()) {
-                                viewModel.sendMessage(input.value)
-                                input.value = ""
-                                keyboardController?.hide()
-                            }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        tint = if (input.value.isNotBlank()) Background else TextTertiary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
+                PulsingSendButton(
+                    enabled = input.value.isNotBlank(),
+                    onClick = {
+                        if (input.value.isNotBlank()) {
+                            viewModel.sendMessage(input.value)
+                            input.value = ""
+                            keyboardController?.hide()
+                        }
+                    },
+                )
             }
         }
 
-        // Sidebar overlay
         if (sidebarOpen) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
+                    .background(Color.Black.copy(alpha = 0.6f))
                     .clickable { sidebarOpen = false },
             )
         }
 
-        // Sidebar
         AnimatedVisibility(
             visible = sidebarOpen,
             enter = slideInHorizontally(
@@ -401,39 +417,84 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun GreetingMessage(message: ChatMessage) {
+private fun AiOrbGreeting(message: ChatMessage) {
+    val pulseScale = remember { Animatable(1f) }
+    val pulseAlpha = remember { Animatable(0.6f) }
+    val glowScale = remember { Animatable(1f) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            pulseScale.animateTo(1.08f, tween(1500, easing = EaseInOutCubic))
+            pulseScale.animateTo(1f, tween(1500, easing = EaseInOutCubic))
+        }
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            pulseAlpha.animateTo(0.9f, tween(2000))
+            pulseAlpha.animateTo(0.4f, tween(2000))
+        }
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            glowScale.animateTo(1.3f, tween(1800, easing = EaseInOutCubic))
+            glowScale.animateTo(1f, tween(1800, easing = EaseInOutCubic))
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 48.dp, bottom = 24.dp),
+            .padding(top = 32.dp, bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Logo circle
         Box(
-            modifier = Modifier
-                .size(48.dp)
-                .background(SurfaceHover, CircleShape)
-                .border(1.dp, Border, CircleShape),
+            modifier = Modifier.size(96.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Default.Email,
-                contentDescription = null,
-                tint = TextSecondary,
-                modifier = Modifier.size(24.dp),
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .scale(pulseScale.value)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                NeonOrange.copy(alpha = 0.3f),
+                                NeonDim.copy(alpha = 0.1f),
+                                Color.Transparent,
+                            ),
+                        ),
+                        CircleShape,
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .scale(pulseScale.value)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = pulseAlpha.value * 0.9f),
+                                NeonBright.copy(alpha = pulseAlpha.value * 0.4f),
+                                NeonOrange.copy(alpha = 0.15f),
+                            ),
+                        ),
+                        CircleShape,
+                    )
+                    .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         Text(
             text = "Hello!",
-            fontSize = 24.sp,
+            fontSize = 26.sp,
             fontWeight = FontWeight.SemiBold,
             color = TextPrimary,
+            letterSpacing = (-0.5).sp,
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = message.text,
@@ -441,15 +502,47 @@ private fun GreetingMessage(message: ChatMessage) {
             lineHeight = 24.sp,
             color = TextSecondary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 24.dp),
+            modifier = Modifier.padding(horizontal = 32.dp),
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = message.timestamp,
             fontSize = 12.sp,
             color = TextTertiary,
+        )
+    }
+}
+
+@Composable
+private fun PulsingSendButton(enabled: Boolean, onClick: () -> Unit) {
+    val glowScale = remember { Animatable(1f) }
+
+    LaunchedEffect(enabled) {
+        if (enabled) {
+            while (true) {
+                glowScale.animateTo(1.2f, tween(1200, easing = EaseInOutCubic))
+                glowScale.animateTo(1f, tween(1200, easing = EaseInOutCubic))
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .background(
+                if (enabled) NeonOrange else Border,
+                CircleShape,
+            )
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.Send,
+            contentDescription = "Send",
+            tint = if (enabled) Background else TextTertiary,
+            modifier = Modifier.size(16.dp),
         )
     }
 }
@@ -481,7 +574,7 @@ private fun MessageBubble(message: ChatMessage) {
                         Icon(
                             imageVector = Icons.Default.Email,
                             contentDescription = null,
-                            tint = TextTertiary,
+                            tint = TextSecondary,
                             modifier = Modifier.size(12.dp),
                         )
                     }
@@ -497,12 +590,16 @@ private fun MessageBubble(message: ChatMessage) {
 
             Box(
                 modifier = Modifier
-                    .background(
-                        color = if (isUser) UserBubble else Color.Transparent,
-                        shape = RoundedCornerShape(18.dp),
-                    )
                     .then(
-                        if (!isUser) Modifier else Modifier.border(0.5.dp, BorderLight, RoundedCornerShape(18.dp))
+                        if (isUser) {
+                            Modifier
+                                .background(UserBubble, RoundedCornerShape(18.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(18.dp))
+                        } else {
+                            Modifier
+                                .background(GlassCard, RoundedCornerShape(18.dp))
+                                .border(0.5.dp, BorderLight.copy(alpha = 0.2f), RoundedCornerShape(18.dp))
+                        }
                     )
                     .padding(
                         horizontal = 14.dp,
@@ -540,8 +637,13 @@ private fun Sidebar(
             modifier = Modifier
                 .width(280.dp)
                 .fillMaxHeight()
-                .background(SurfaceBg)
-                .padding(16.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(SurfaceBg, SurfaceCard),
+                    )
+                )
+                .padding(horizontal = 16.dp)
+                .padding(top = 40.dp, bottom = 16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
             Row(
@@ -568,40 +670,7 @@ private fun Sidebar(
             Spacer(modifier = Modifier.height(16.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 features.forEach { feature ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                if (feature.enabled) SurfaceHover else Color.Transparent,
-                                RoundedCornerShape(12.dp),
-                            )
-                            .clickable { onFeatureClick(feature) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(
-                                    if (feature.enabled) SuccessGreen else TextTertiary,
-                                    CircleShape,
-                                )
-                        )
-                        Column {
-                            Text(
-                                text = feature.name,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = TextPrimary,
-                            )
-                            Text(
-                                text = feature.description,
-                                fontSize = 12.sp,
-                                color = TextTertiary,
-                            )
-                        }
-                    }
+                    FeatureCard(feature = feature, onClick = { onFeatureClick(feature) })
                 }
             }
         }
@@ -615,6 +684,60 @@ private fun Sidebar(
 }
 
 @Composable
+private fun FeatureCard(feature: FeatureItem, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                if (feature.enabled) SurfaceHover else GlassCard,
+                RoundedCornerShape(12.dp),
+            )
+            .border(
+                width = if (feature.enabled) 1.5.dp else 0.5.dp,
+                color = if (feature.enabled) Color.White.copy(alpha = 0.5f) else Border.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(12.dp),
+            )
+            .clickable { onClick() }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .then(
+                    if (feature.enabled) {
+                        Modifier
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(SuccessGreen.copy(alpha = 0.4f), Color.Transparent),
+                                ),
+                                CircleShape,
+                            )
+                    } else Modifier
+                )
+                .background(
+                    if (feature.enabled) SuccessGreen else TextTertiary,
+                    CircleShape,
+                ),
+        )
+        Column {
+            Text(
+                text = feature.name,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = TextPrimary,
+            )
+            Text(
+                text = feature.description,
+                fontSize = 12.sp,
+                color = TextTertiary,
+            )
+        }
+    }
+}
+
+@Composable
 private fun PermissionsModal(
     isOpen: Boolean,
     onClose: () -> Unit,
@@ -624,13 +747,19 @@ private fun PermissionsModal(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f)),
+            .background(Color.Black.copy(alpha = 0.7f)),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
-                .background(SurfaceElevated, RoundedCornerShape(16.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(SurfaceElevated, SurfaceCard),
+                    ),
+                    RoundedCornerShape(16.dp),
+                )
+                .border(1.dp, BorderLight.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                 .padding(24.dp),
         ) {
             Row(
@@ -672,7 +801,8 @@ private fun PermissionsModal(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(SurfaceCard, RoundedCornerShape(12.dp))
+                            .background(GlassCard, RoundedCornerShape(12.dp))
+                            .border(0.5.dp, Border.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -680,7 +810,8 @@ private fun PermissionsModal(
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
-                                .background(SurfaceHover, CircleShape),
+                                .background(SurfaceHover, CircleShape)
+                                .border(0.5.dp, Border, CircleShape),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(imageVector = icon, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
@@ -700,8 +831,8 @@ private fun PermissionsModal(
                 },
                 modifier = Modifier.fillMaxWidth().height(44.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = SurfaceHover,
-                    contentColor = TextPrimary,
+                    containerColor = NeonOrange,
+                    contentColor = Background,
                 ),
                 shape = RoundedCornerShape(12.dp),
             ) {
@@ -727,13 +858,19 @@ private fun FeatureSettingsSheet(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f)),
+            .background(Color.Black.copy(alpha = 0.7f)),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(SurfaceElevated, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(SurfaceElevated, SurfaceCard),
+                    ),
+                    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                )
+                .border(1.dp, BorderLight.copy(alpha = 0.15f), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .padding(24.dp),
         ) {
             Row(
@@ -770,7 +907,7 @@ private fun FeatureSettingsSheet(
                         .width(44.dp)
                         .height(24.dp)
                         .background(
-                            if (enabled) Accent else Border,
+                            if (enabled) NeonOrange else Border,
                             RoundedCornerShape(12.dp),
                         )
                         .clickable { enabled = !enabled },
@@ -803,8 +940,8 @@ private fun FeatureSettingsSheet(
                     steps = 2,
                     modifier = Modifier.fillMaxWidth(),
                     colors = SliderDefaults.colors(
-                        thumbColor = Accent,
-                        activeTrackColor = Accent,
+                        thumbColor = NeonOrange,
+                        activeTrackColor = NeonOrange,
                         inactiveTrackColor = Border,
                     ),
                 )
@@ -838,8 +975,8 @@ private fun FeatureSettingsSheet(
                     },
                     modifier = Modifier.weight(1f).height(44.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = SurfaceHover,
-                        contentColor = TextPrimary,
+                        containerColor = NeonOrange,
+                        contentColor = Background,
                     ),
                     shape = RoundedCornerShape(12.dp),
                 ) {
