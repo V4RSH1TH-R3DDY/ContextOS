@@ -12,6 +12,7 @@ import androidx.navigation.compose.rememberNavController
 import com.contextos.app.ui.navigation.ContextOSNavGraph
 import com.contextos.app.ui.navigation.StartDestinationViewModel
 import com.contextos.app.ui.theme.ContextOSTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -28,10 +29,19 @@ class MainActivity : ComponentActivity() {
                 val viewModel: StartDestinationViewModel = viewModel()
                 val startDestination by viewModel.startDestination.collectAsState()
 
-                ContextOSNavGraph(
-                    navController = navController,
-                    startDestination = startDestination,
-                )
+                if (startDestination == null) {
+                    androidx.compose.foundation.layout.Box(
+                        modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator()
+                    }
+                } else {
+                    ContextOSNavGraph(
+                        navController = navController,
+                        startDestination = startDestination!!,
+                    )
+                }
             }
         }
     }

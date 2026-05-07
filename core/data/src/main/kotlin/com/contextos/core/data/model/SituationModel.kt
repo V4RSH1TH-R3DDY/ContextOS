@@ -18,6 +18,18 @@ data class SituationModel(
     val wifiSsid: String? = null,
     val isMobileDataConnected: Boolean = false,
     val analysis: SituationAnalysis? = null,
+
+    // Phase 11.1 — Galaxy Watch wearable context
+    val wearableSummary: String? = null,
+
+    // Phase 11.2 — Galaxy Buds audio context
+    val budsReasoningPoints: List<String>? = null,
+    val budsAnomalyFlags: List<String>? = null,
+    val budsSuppressDnd: Boolean = false,
+
+    // Phase 11.3 — SmartThings presence context
+    val smartThingsIsHome: Boolean? = null,
+    val smartThingsMode: String? = null,
 )
 
 @Serializable

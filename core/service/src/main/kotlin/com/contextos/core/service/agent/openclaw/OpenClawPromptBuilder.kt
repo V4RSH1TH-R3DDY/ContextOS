@@ -170,6 +170,6 @@ class OpenClawPromptBuilder @Inject constructor() {
         val dow = dayNames[cal.get(java.util.Calendar.DAY_OF_WEEK) - 1]
         val h = cal.get(java.util.Calendar.HOUR_OF_DAY)
         val m = cal.get(java.util.Calendar.MINUTE)
-        return "$dow ${String.format("%02d:%02d", h, m)}"
+        return "$dow ${String.format(java.util.Locale.US, "%02d:%02d", h, m)}"
     }
 }

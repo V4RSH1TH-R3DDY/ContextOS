@@ -70,12 +70,18 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     // Google Play Services & API clients
-    implementation(libs.play.services.auth)
+    api(libs.play.services.auth)
     implementation(libs.google.api.client.android)
-    implementation(libs.google.api.services.calendar)
-    implementation(libs.google.api.services.gmail)
-    implementation(libs.google.api.services.drive)
+    api(libs.google.api.services.calendar)
+    api(libs.google.api.services.gmail)
+    api(libs.google.api.services.drive)
 
     // Project modules
     implementation(project(":core:data"))
+
+    // Testing
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("io.mockk:mockk:1.13.8")
 }

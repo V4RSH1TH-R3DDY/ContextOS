@@ -10,6 +10,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.core.content.edit
 import com.contextos.core.data.db.dao.CalendarEventCacheDao
 import com.contextos.core.data.db.entity.CalendarEventCacheEntity
 import org.json.JSONArray
@@ -43,7 +44,7 @@ class CalendarSyncWorker @AssistedInject constructor(
             val syncToken = prefs.getString(KEY_SYNC_TOKEN, null)
             var result = calendarApiClient.syncUpcomingEvents(hoursAhead = 8, syncToken = syncToken)
             if (result.tokenExpired) {
-                prefs.edit().remove(KEY_SYNC_TOKEN).apply()
+                prefs.edit { remove(KEY_SYNC_TOKEN) }
                 result = calendarApiClient.syncUpcomingEvents(hoursAhead = 8, syncToken = null)
             }
 
@@ -69,7 +70,7 @@ class CalendarSyncWorker @AssistedInject constructor(
             }
             calendarEventCacheDao.deleteEventsBefore(nowMs)
             result.nextSyncToken?.let { token ->
-                prefs.edit().putString(KEY_SYNC_TOKEN, token).apply()
+                prefs.edit { putString(KEY_SYNC_TOKEN, token) }
             }
 
             Log.i(TAG, "Calendar sync complete — ${entities.size} events cached")
@@ -119,7 +120,7 @@ class CalendarSyncWorker @AssistedInject constructor(
         val lastApiCallMs = prefs.getLong(KEY_LAST_API_CALL_MS, 0L)
         if (nowMs - lastApiCallMs < MIN_API_CALL_INTERVAL_MS) return false
 
-        prefs.edit().putLong(KEY_LAST_API_CALL_MS, nowMs).apply()
+        prefs.edit { putLong(KEY_LAST_API_CALL_MS, nowMs) }
         return true
     }
 }

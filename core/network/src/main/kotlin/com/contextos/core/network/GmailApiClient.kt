@@ -73,6 +73,36 @@ class GmailApiClient @Inject constructor(
         }
 
     /**
+     * Searches the user's inbox messages using the specified [query].
+     * Returns up to [maxResults] messages (metadata only).
+     */
+    suspend fun searchMessages(query: String, maxResults: Long = 10): List<Message> =
+        withContext(Dispatchers.IO) {
+            val service = buildService()
+                ?: return@withContext emptyList<Message>().also {
+                    Log.w(TAG, "searchMessages: not signed in")
+                }
+
+            try {
+                retryWithBackoff(tag = TAG) {
+                    service.users().messages().list(USER_ME)
+                        .setQ(query)
+                        .setMaxResults(maxResults)
+                        .setFields("messages(id,threadId,snippet,labelIds)")
+                        .execute()
+                        .messages
+                        ?: emptyList()
+                }
+            } catch (e: UserRecoverableAuthIOException) {
+                Log.w(TAG, "User needs to re-authorize Gmail access", e)
+                emptyList()
+            } catch (e: IOException) {
+                Log.e(TAG, "Failed to search Gmail messages after retries", e)
+                emptyList()
+            }
+        }
+
+    /**
      * Fetches the full content of a single message by [messageId].
      * Used by Phase 3.5 (LLM Message Drafting) to read message bodies.
      *

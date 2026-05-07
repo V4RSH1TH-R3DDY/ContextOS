@@ -9,6 +9,8 @@ import com.contextos.core.data.model.SituationModel
 import com.contextos.core.memory.LocationMemoryManager
 import com.contextos.core.service.agent.MemorySummaryBuilder
 import com.contextos.core.service.agent.SituationModeler
+import com.contextos.core.service.samsung.BudsStateReceiver
+import com.contextos.core.service.samsung.WearableDataReceiver
 import org.json.JSONArray
 import java.util.Calendar
 import javax.inject.Inject
@@ -23,6 +25,8 @@ import javax.inject.Singleton
  * - Infer `locationLabel` from [LocationMemoryManager]
  * - Populate `memorySummary` from [MemorySummaryBuilder] (aggregates all memory managers)
  * - Perform `SituationAnalysis` using [SituationModeler]
+ * - Integrate Galaxy Watch wearable data (Phase 11.1)
+ * - Integrate Galaxy Buds audio context (Phase 11.2)
  */
 @Singleton
 class SituationModelBuilder @Inject constructor(
@@ -30,6 +34,8 @@ class SituationModelBuilder @Inject constructor(
     private val locationMemoryManager: LocationMemoryManager,
     private val memorySummaryBuilder: MemorySummaryBuilder,
     private val situationModeler: SituationModeler,
+    private val wearableDataReceiver: WearableDataReceiver,
+    private val budsStateReceiver: BudsStateReceiver,
 ) {
 
     suspend fun build(raw: RawSensorData): SituationModel {
@@ -53,7 +59,7 @@ class SituationModelBuilder @Inject constructor(
         val hour = calendar.get(Calendar.HOUR_OF_DAY)
         val minutes = calendar.get(Calendar.MINUTE)
         val roundedMinutes = if (minutes < 30) 0 else 30
-        val timeSlot = String.format("%02d:%02d", hour, roundedMinutes)
+        val timeSlot = String.format(java.util.Locale.US, "%02d:%02d", hour, roundedMinutes)
 
         val memorySummary = memorySummaryBuilder.build(
             dayOfWeek = dayOfWeek,
@@ -61,6 +67,22 @@ class SituationModelBuilder @Inject constructor(
             latitude  = location?.latitude,
             longitude = location?.longitude,
         )
+
+        // Phase 11.1 — Galaxy Watch context (graceful degradation if no watch paired)
+        val wearableSummary = try {
+            wearableDataReceiver.getContextSummary()
+        } catch (e: Exception) {
+            Log.w(TAG, "Wearable context unavailable", e)
+            null
+        }
+
+        // Phase 11.2 — Galaxy Buds context (graceful degradation if no buds paired)
+        val budsInference = try {
+            budsStateReceiver.getContextInferences()
+        } catch (e: Exception) {
+            Log.w(TAG, "Buds context unavailable", e)
+            null
+        }
 
         val baseModel = SituationModel(
             currentTime          = raw.timestampMs,
@@ -76,6 +98,12 @@ class SituationModelBuilder @Inject constructor(
             locationLabel        = locationLabel,
             wifiSsid             = raw.wifiSsid,
             isMobileDataConnected = raw.isMobileDataConnected,
+            // Phase 11.1 — Galaxy Watch
+            wearableSummary      = wearableSummary,
+            // Phase 11.2 — Galaxy Buds
+            budsReasoningPoints  = budsInference?.reasoningPoints,
+            budsAnomalyFlags     = budsInference?.anomalyFlags,
+            budsSuppressDnd      = budsInference?.suppressDndSetter ?: false,
         )
 
         val analysis = situationModeler.analyze(baseModel)

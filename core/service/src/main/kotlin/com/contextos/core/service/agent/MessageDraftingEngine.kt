@@ -3,6 +3,7 @@ package com.contextos.core.service.agent
 import android.util.Log
 import com.contextos.core.data.model.DraftingContext
 import com.contextos.core.service.agent.openclaw.OpenClawAgent
+import com.contextos.core.data.model.MessageDrafter
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,7 +19,7 @@ import javax.inject.Singleton
 @Singleton
 class MessageDraftingEngine @Inject constructor(
     private val openClawAgent: OpenClawAgent,
-) {
+) : MessageDrafter {
 
     /**
      * Drafts a short, natural-sounding message for the given [context].
@@ -26,7 +27,7 @@ class MessageDraftingEngine @Inject constructor(
      * @return A draft string ready to be shown to the user for review.
      *         Never empty — falls back to rule-based templates on any error.
      */
-    suspend fun draft(context: DraftingContext): String {
+    override suspend fun draft(context: DraftingContext): String {
         return try {
             val llmDraft = openClawAgent.draftMessage(context)
             if (llmDraft.isNotBlank()) {

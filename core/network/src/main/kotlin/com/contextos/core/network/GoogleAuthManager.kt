@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import android.annotation.SuppressLint
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -45,11 +46,11 @@ class GoogleAuthManager @Inject constructor(
 
     private val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
         .requestEmail()
-        .requestScopes(
-            Scope(SCOPE_CALENDAR),
-            Scope(SCOPE_GMAIL),
-            Scope(SCOPE_DRIVE),
-        )
+        // .requestScopes(
+        //     Scope(SCOPE_CALENDAR),
+        //     Scope(SCOPE_GMAIL),
+        //     Scope(SCOPE_DRIVE),
+        // )
         .build()
 
     /** Use this client to launch the sign-in Intent from any Activity/Fragment. */
@@ -127,9 +128,10 @@ class GoogleAuthManager @Inject constructor(
      * Invalidates [token] in the Play Services cache so the next [getAccessToken]
      * call forces a network refresh. Call this whenever an API returns HTTP 401.
      */
+    @SuppressLint("MissingPermission")
     suspend fun invalidateToken(token: String) = withContext(Dispatchers.IO) {
         try {
-            GoogleAuthUtil.invalidateToken(context, token)
+            GoogleAuthUtil.clearToken(context, token)
             Log.d(TAG, "Token invalidated — next call will refresh")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to invalidate token (non-fatal)", e)

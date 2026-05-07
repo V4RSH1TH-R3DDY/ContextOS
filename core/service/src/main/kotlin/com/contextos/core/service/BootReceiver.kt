@@ -17,12 +17,17 @@ import android.util.Log
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-
-        Log.i(TAG, "Boot complete — starting ContextOS service")
-
-        // Start the foreground service
-        ContextOSServiceManager.startService(context)
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            Log.i(TAG, "Boot complete — starting ContextOS service")
+            ContextOSServiceManager.startService(context)
+            AgentCycleWorker.schedule(context)
+        } else if (intent.action == "com.contextos.TEST_NOTIFICATION") {
+            Log.i(TAG, "Received TEST_NOTIFICATION intent")
+            val serviceIntent = Intent(context, ContextOSService::class.java).apply {
+                action = ContextOSService.ACTION_TEST_NOTIFICATION
+            }
+            context.startForegroundService(serviceIntent)
+        }
 
         // Re-schedule the WorkManager periodic worker (it persists across reboots,
         // but KEEP policy means this is a no-op if already enqueued)

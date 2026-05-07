@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 import com.contextos.core.service.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -87,13 +88,11 @@ class ContextOSNotificationManager @Inject constructor(
         description: String,
         importance: Int,
     ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(id, name, importance).apply {
-                this.description = description
-                setShowBadge(false)
-            }
-            manager.createNotificationChannel(channel)
+        val channel = NotificationChannel(id, name, importance).apply {
+            this.description = description
+            setShowBadge(false)
         }
+        manager.createNotificationChannel(channel)
     }
 
     // ── Info notification (auto-executed action) ──
@@ -367,7 +366,7 @@ class ContextOSNotificationManager @Inject constructor(
     }
 
     private fun createOpenUrlIntent(url: String): PendingIntent {
-        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         return PendingIntent.getActivity(

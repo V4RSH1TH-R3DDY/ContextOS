@@ -50,4 +50,10 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:memory"))
     implementation(project(":core:network"))
+
+    // Testing
+    testImplementation(libs.junit)
+    testImplementation("io.mockk:mockk:1.13.8")
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation("org.robolectric:robolectric:4.11.1")
 }

@@ -178,6 +178,7 @@ internal data class Element(
     val status: String,
     val duration: Value,
     val distance: Value? = null,
+    @kotlinx.serialization.SerialName("duration_in_traffic")
     val durationInTraffic: Value? = null,
 )
 

@@ -15,13 +15,13 @@ class StartDestinationViewModel @Inject constructor(
     preferencesManager: PreferencesManager,
 ) : ViewModel() {
 
-    val startDestination: StateFlow<String> = preferencesManager.isOnboardingComplete
+    val startDestination: StateFlow<String?> = preferencesManager.isOnboardingComplete
         .map { complete ->
             if (complete) Screen.Dashboard.route else Screen.Onboarding.Welcome.route
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = Screen.Onboarding.Welcome.route,
+            initialValue = null,
         )
 }

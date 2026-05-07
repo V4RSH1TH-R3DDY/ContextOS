@@ -1,3 +1,10 @@
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) load(file.inputStream())
+}
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
@@ -13,6 +20,18 @@ android {
         minSdk = 31
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+        
+        buildConfigField("String", "OPENCLAW_API_KEY", "\"${localProperties.getProperty("OPENCLAW_API_KEY", "")}\"")
+        buildConfigField("String", "OPENCLAW_API_ENDPOINT", "\"https://generativelanguage.googleapis.com/v1beta/models\"")
+        buildConfigField("boolean", "OPENCLAW_ENABLE_REASONING", localProperties.getProperty("OPENCLAW_ENABLE_REASONING", "true"))
+        buildConfigField("boolean", "OPENCLAW_ENABLE_DRAFTING", localProperties.getProperty("OPENCLAW_ENABLE_DRAFTING", "true"))
+        buildConfigField("String", "OPENCLAW_REASONING_MODEL", "\"${localProperties.getProperty("OPENCLAW_REASONING_MODEL", "gemini-2.0-flash")}\"")
+        buildConfigField("String", "OPENCLAW_DRAFTING_MODEL", "\"${localProperties.getProperty("OPENCLAW_DRAFTING_MODEL", "gemini-2.0-flash-lite")}\"")
+        buildConfigField("String", "OPENCLAW_CHAT_MODEL", "\"${localProperties.getProperty("OPENCLAW_CHAT_MODEL", "gemini-2.0-flash")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {

@@ -14,6 +14,7 @@ import android.net.wifi.WifiManager
 import android.os.BatteryManager
 
 import android.util.Log
+import android.annotation.SuppressLint
 import android.app.usage.UsageStatsManager
 import com.contextos.core.data.model.AmbientAudioContext
 import com.contextos.core.data.model.AppUsageEntry
@@ -146,6 +147,7 @@ class SensorDataCollector @Inject constructor(
     // App usage
     // ─────────────────────────────────────────────────────────────────────────
 
+    @SuppressLint("MissingPermission")
     private fun collectAppUsage(nowMs: Long): List<AppUsageEntry> {
         return try {
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -251,6 +253,7 @@ class SensorDataCollector @Inject constructor(
     // Time since last unlock
     // ─────────────────────────────────────────────────────────────────────────
 
+    @SuppressLint("MissingPermission")
     private fun collectTimeSinceLastUnlock(nowMs: Long): Long? {
         return try {
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -278,7 +281,7 @@ class SensorDataCollector @Inject constructor(
 
     private data class ConnectivityInfo(val wifiSsid: String?, val isMobileDataConnected: Boolean)
 
-    @Suppress("DEPRECATION")
+    @SuppressLint("MissingPermission", "DEPRECATION")
     private fun collectConnectivity(): ConnectivityInfo {
         var wifiSsid: String?         = null
         var isMobileDataConnected      = false

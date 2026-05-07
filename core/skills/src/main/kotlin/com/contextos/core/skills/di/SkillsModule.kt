@@ -5,6 +5,9 @@ import com.contextos.core.skills.DndSetterSkill
 import com.contextos.core.skills.LocationIntelligenceSkill
 import com.contextos.core.skills.NavigationLauncherSkill
 import com.contextos.core.skills.PhaseOneHeartbeatSkill
+import com.contextos.core.skills.PersonalNudgeSkill
+import com.contextos.core.skills.DocumentFetcherSkill
+import com.contextos.core.skills.MessageDrafterSkill
 import com.contextos.core.skills.Skill
 import dagger.Module
 import dagger.Binds
@@ -45,4 +48,17 @@ abstract class SkillsModule {
     @Binds
     @IntoSet
     abstract fun bindLocationIntelligenceSkill(skill: LocationIntelligenceSkill): Skill
+
+    @Binds
+    @IntoSet
+    abstract fun bindPersonalNudgeSkill(skill: PersonalNudgeSkill): Skill
+
+    @Binds
+    @IntoSet
+    abstract fun bindDocumentFetcherSkill(skill: DocumentFetcherSkill): Skill
+
+    @Binds
+    @IntoSet
+    abstract fun bindMessageDrafterSkill(skill: MessageDrafterSkill): Skill
 }
+
