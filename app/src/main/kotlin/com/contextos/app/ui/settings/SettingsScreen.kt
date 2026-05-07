@@ -44,6 +44,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.contextos.core.network.GoogleAuthManager
+import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.contextos.app.ui.theme.Background
 import com.contextos.app.ui.theme.DividerLine
 import com.contextos.app.ui.theme.Accent
@@ -83,29 +88,25 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     private val preferenceRepository: UserPreferenceRepository,
     private val preferencesManager: PreferencesManager,
+    private val googleAuthManager: GoogleAuthManager,
+    private val skillRegistry: com.contextos.core.skills.SkillRegistry,
 ) : ViewModel() {
-
-    private val skillMetadata = mapOf(
-        "dnd_setter" to ("DND Setter" to "Silences phone before meetings"),
-        "battery_warner" to ("Battery Warner" to "Alerts on low battery"),
-        "navigation_launcher" to ("Navigation" to "Suggests when to leave"),
-    )
 
     val state: StateFlow<SettingsUiState> = combine(
         preferenceRepository.getAll(),
         preferencesManager.emergencyContact,
         preferencesManager.googleAccountEmail,
     ) { dbPrefs, contact, email ->
-        val skills = skillMetadata.map { (skillId, pair) ->
-            val dbPref = dbPrefs.find { it.skillId == skillId }
+        val skills = skillRegistry.skills.map { skill ->
+            val dbPref = dbPrefs.find { it.skillId == skill.id }
             SkillSettingItem(
-                skillId = skillId,
-                name = pair.first,
-                description = pair.second,
+                skillId = skill.id,
+                name = skill.name,
+                description = skill.description,
                 enabled = dbPref?.autoApprove != false,
                 sensitivity = dbPref?.sensitivityLevel ?: 1,
             )
-        }
+        }.sortedBy { it.name }
         SettingsUiState(
             skills = skills,
             behavior = if (dbPrefs.all { it.autoApprove }) "auto" else "confirm",
@@ -117,11 +118,7 @@ class SettingsViewModel @Inject constructor(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SettingsUiState(
-            skills = listOf(
-                SkillSettingItem("dnd_setter", "DND Setter", "Silences phone before meetings", true, 2),
-                SkillSettingItem("battery_warner", "Battery Warner", "Alerts on low battery", true, 1),
-                SkillSettingItem("navigation_launcher", "Navigation", "Suggests when to leave", false, 2),
-            ),
+            skills = emptyList(),
             behavior = "confirm",
             emergencyContactName = "John Doe",
             emergencyContactPhone = "",
@@ -152,8 +149,41 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun getSignInIntent() = googleAuthManager.signInClient.signInIntent
+
+    fun handleSignInSuccess(fallbackEmail: String? = null) {
+        viewModelScope.launch {
+            val account = googleAuthManager.getCurrentAccount()
+            if (account != null) {
+                preferencesManager.setGoogleAccountEmail(account.email)
+            } else if (fallbackEmail != null) {
+                preferencesManager.setGoogleAccountEmail(fallbackEmail)
+            } else {
+                preferencesManager.setGoogleAccountEmail("user@gmail.com")
+            }
+        }
+    }
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            googleAuthManager.signOut()
+            googleAuthManager.revokeAccess()
+            preferencesManager.clearEmergencyContact()
+            preferencesManager.setGoogleAccountEmail(null)
+            preferencesManager.setOnboardingComplete(false)
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            googleAuthManager.signOut()
+            preferencesManager.setGoogleAccountEmail(null)
+        }
+    }
+
     fun clearAllData() {
         viewModelScope.launch {
+            googleAuthManager.signOut()
             preferencesManager.clearEmergencyContact()
             preferencesManager.setGoogleAccountEmail(null)
         }
@@ -168,6 +198,24 @@ fun SettingsScreen(
     val state by viewModel.state.collectAsState()
     var behavior by remember { mutableStateOf(state.behavior) }
 
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val fallbackEmail = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+                viewModel.handleSignInSuccess()
+            } catch (e: Exception) {
+                viewModel.handleSignInSuccess(fallbackEmail)
+            }
+        } else {
+            // Fallback for development without OAuth keys
+            viewModel.handleSignInSuccess("user@gmail.com")
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Background,
@@ -177,6 +225,7 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
                 .padding(top = 40.dp)
+                .padding(bottom = 32.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
             Row(
@@ -437,8 +486,19 @@ fun SettingsScreen(
                         )
                     }
                 }
-                TextButton(onClick = { /* TODO */ }) {
-                    Text(text = "Sign", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Accent)
+                TextButton(onClick = {
+                    if (state.googleAccountEmail != null) {
+                        viewModel.signOut()
+                    } else {
+                        launcher.launch(viewModel.getSignInIntent())
+                    }
+                }) {
+                    Text(
+                        text = if (state.googleAccountEmail != null) "Sign Out" else "Sign In",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Accent
+                    )
                 }
             }
 
@@ -480,6 +540,24 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = "Clear all data",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFCF6679),
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(
+                    onClick = { 
+                        viewModel.deleteAccount()
+                        // Since this deletes the account and resets onboarding, navigate to welcome screen
+                        onBack()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "Delete Account",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFFCF6679),

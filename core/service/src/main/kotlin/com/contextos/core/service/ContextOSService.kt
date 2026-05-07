@@ -36,6 +36,7 @@ class ContextOSService : Service() {
 
     @Inject lateinit var contextAgent: ContextAgent
     @Inject lateinit var healthMonitor: ServiceHealthMonitor
+    @Inject lateinit var notificationManager: com.contextos.core.service.notifications.ContextOSNotificationManager
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var agentLoopJob: Job? = null
@@ -55,6 +56,12 @@ class ContextOSService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
+            }
+            ACTION_TEST_NOTIFICATION -> {
+                notificationManager.showInfoNotification(
+                    title = "Test Notification",
+                    body = "This is a test notification from ContextOS!",
+                )
             }
             else -> {
                 // ACTION_START or null — start / resume the service
@@ -110,9 +117,10 @@ class ContextOSService : Service() {
      * The service reschedules the alarm each time [onStartCommand] is called (including
      * when the alarm fires), so effectively creating a self-rescheduling wakeup chain.
      */
+    @android.annotation.SuppressLint("MissingPermission")
     private fun scheduleExactAlarm() {
         val alarmManager = getSystemService(AlarmManager::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+        if (!alarmManager.canScheduleExactAlarms()) {
             Log.w(TAG, "Exact alarm permission unavailable; relying on WorkManager fallback")
             return
         }
@@ -176,6 +184,7 @@ class ContextOSService : Service() {
 
         const val ACTION_START = "com.contextos.START"
         const val ACTION_STOP  = "com.contextos.STOP"
+        const val ACTION_TEST_NOTIFICATION = "com.contextos.TEST_NOTIFICATION"
         const val NOTIFICATION_ID = 1001
     }
 }

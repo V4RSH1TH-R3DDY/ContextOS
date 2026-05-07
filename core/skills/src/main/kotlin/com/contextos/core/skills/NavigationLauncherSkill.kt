@@ -3,6 +3,7 @@ package com.contextos.core.skills
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.net.toUri
 import com.contextos.core.data.db.dao.UserPreferenceDao
 import com.contextos.core.data.model.ActionOutcome
 import com.contextos.core.data.model.LatLng
@@ -141,7 +142,7 @@ class NavigationLauncherSkill @Inject constructor(
         val encodedDestination = Uri.encode(destination)
         val intent = Intent(
             Intent.ACTION_VIEW,
-            Uri.parse("google.navigation:q=$encodedDestination&mode=d"),
+            "google.navigation:q=$encodedDestination&mode=d".toUri(),
         ).apply {
             setPackage("com.google.android.apps.maps")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -157,6 +158,7 @@ class NavigationLauncherSkill @Inject constructor(
          * Used for a rough proximity check — sufficient for the 500 m radius.
          */
         private fun haversineDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+            if (lat1 == lat2 && lon1 == lon2) return 0.0
             if (lat2 == 0.0 && lon2 == 0.0) return Double.MAX_VALUE
 
             val earthRadiusM = 6_371_000.0

@@ -32,7 +32,7 @@ class RoutineMemoryManager @Inject constructor(
         val minutes = calendar.get(java.util.Calendar.MINUTE)
         val roundedMinutes = if (minutes < 30) 0 else 30
         val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
-        val timeSlot = String.format("%02d:%02d", hour, roundedMinutes)
+        val timeSlot = String.format(java.util.Locale.US, "%02d:%02d", hour, roundedMinutes)
 
         val existing = dao.getByDayAndSlot(dayOfWeek, timeSlot)
         if (existing != null) {

@@ -11,5 +11,5 @@ import javax.inject.Singleton
 abstract class OpenClawModule {
     @Binds
     @Singleton
-    abstract fun bindOpenClawAgent(impl: MockOpenClawAgent): OpenClawAgent
+    abstract fun bindOpenClawAgent(impl: RealOpenClawAgent): OpenClawAgent
 }

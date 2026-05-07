@@ -6,12 +6,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.contextos.core.data.db.ContextOSDatabase
 import com.contextos.core.data.db.dao.ActionLogDao
+import com.contextos.core.data.db.dao.BudsContextDao
 import com.contextos.core.data.db.dao.CalendarEventCacheDao
 import com.contextos.core.data.db.dao.ConfirmedRoutineDao
 import com.contextos.core.data.db.dao.LocationMemoryDao
 import com.contextos.core.data.db.dao.PreferenceMemoryDao
 import com.contextos.core.data.db.dao.RoutineMemoryDao
 import com.contextos.core.data.db.dao.UserPreferenceDao
+import com.contextos.core.data.db.dao.WearableContextDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -42,7 +44,37 @@ object DatabaseModule {
                     observation_count INTEGER NOT NULL,
                     last_observed INTEGER NOT NULL,
                     suggested_action TEXT NOT NULL,
-                    is_active INTEGER NOT NULL DEFAULT 1
+                    is_active INTEGER NOT NULL
+                )
+            """)
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_confirmed_routine_day_of_week_time_slot_start ON confirmed_routine(day_of_week, time_slot_start)")
+        }
+    }
+
+    /**
+     * Phase 11 migration: adds wearable_context and buds_context tables
+     * for Galaxy Watch and Galaxy Buds integration.
+     */
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS wearable_context (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    activity_type TEXT NOT NULL,
+                    heart_rate INTEGER,
+                    step_count_delta INTEGER NOT NULL,
+                    device_connected INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS buds_context (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    buds_in_ear TEXT NOT NULL,
+                    anc_active INTEGER NOT NULL DEFAULT 0,
+                    ambient_sound_active INTEGER NOT NULL DEFAULT 0,
+                    device_connected INTEGER NOT NULL DEFAULT 0
                 )
             """)
         }
@@ -57,7 +89,7 @@ object DatabaseModule {
             context,
             ContextOSDatabase::class.java,
             "contextos.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
          .build()
 
     @Provides
@@ -94,4 +126,14 @@ object DatabaseModule {
     @Singleton
     fun provideConfirmedRoutineDao(db: ContextOSDatabase): ConfirmedRoutineDao =
         db.confirmedRoutineDao()
+
+    @Provides
+    @Singleton
+    fun provideWearableContextDao(db: ContextOSDatabase): WearableContextDao =
+        db.wearableContextDao()
+
+    @Provides
+    @Singleton
+    fun provideBudsContextDao(db: ContextOSDatabase): BudsContextDao =
+        db.budsContextDao()
 }

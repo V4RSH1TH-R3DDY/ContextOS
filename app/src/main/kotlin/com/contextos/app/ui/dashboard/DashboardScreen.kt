@@ -89,6 +89,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import com.contextos.app.ui.background.RippleGridBackground
 import com.contextos.app.ui.theme.Background
 import com.contextos.app.ui.theme.Border
@@ -137,6 +142,9 @@ data class FeatureItem(
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val preferencesManager: PreferencesManager,
+    private val openClawAgent: com.contextos.core.service.agent.openclaw.OpenClawAgent,
+    private val skillRegistry: com.contextos.core.skills.SkillRegistry,
+    private val userPreferenceRepository: com.contextos.core.data.repository.UserPreferenceRepository,
 ) : ViewModel() {
 
     val _messages = mutableStateOf(
@@ -150,15 +158,34 @@ class DashboardViewModel @Inject constructor(
         )
     )
 
-    val features = mutableStateOf(
-        listOf(
-            FeatureItem("1", "DND Setter", "Silences phone before meetings", true, 2),
-            FeatureItem("2", "Battery Warner", "Alerts on low battery", true, 1),
-            FeatureItem("3", "Navigation", "Suggests when to leave", false, 2),
-            FeatureItem("4", "Meeting Alert", "Smart meeting reminders", true, 2),
-            FeatureItem("5", "System Monitor", "Monitors system health", false, 1),
+    val isTyping = mutableStateOf(false)
+
+    /** Conversation history for multi-turn context (system + user + model turns). */
+    private val chatHistory = mutableListOf(
+        com.contextos.core.service.agent.openclaw.ChatTurn(
+            role = "system",
+            content = buildSystemPrompt(),
         )
     )
+
+    val features: StateFlow<List<FeatureItem>> = userPreferenceRepository.getAll()
+        .map { dbPrefs ->
+            skillRegistry.skills.map { skill ->
+                val dbPref = dbPrefs.find { it.skillId == skill.id }
+                FeatureItem(
+                    id = skill.id,
+                    name = skill.name,
+                    description = skill.description,
+                    enabled = dbPref?.autoApprove != false, // Default true
+                    sensitivity = dbPref?.sensitivityLevel ?: 1,
+                )
+            }.sortedBy { it.name }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
 
     fun sendMessage(text: String) {
         if (text.isBlank()) return
@@ -170,27 +197,41 @@ class DashboardViewModel @Inject constructor(
             timestamp = now,
         )
         _messages.value = _messages.value + userMsg
+        chatHistory.add(com.contextos.core.service.agent.openclaw.ChatTurn(role = "user", content = text))
+
+        isTyping.value = true
         viewModelScope.launch {
-            delay(1200)
-            val responses = listOf(
-                "I'll look into that and get back to you.",
-                "Got it. I'm checking your context now.",
-                "Understood. Let me process that for you.",
-                "I see. I'll adjust things accordingly.",
-            )
-            val response = ChatMessage(
-                id = (System.currentTimeMillis() + 2).toString(),
-                text = responses.random(),
-                sender = "assistant",
-                timestamp = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date()),
-            )
-            _messages.value = _messages.value + response
+            try {
+                val responseText = openClawAgent.chat(chatHistory.toList())
+                chatHistory.add(com.contextos.core.service.agent.openclaw.ChatTurn(role = "model", content = responseText))
+                val response = ChatMessage(
+                    id = (System.currentTimeMillis() + 2).toString(),
+                    text = responseText,
+                    sender = "assistant",
+                    timestamp = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date()),
+                )
+                _messages.value = _messages.value + response
+            } catch (e: Exception) {
+                val errorMsg = ChatMessage(
+                    id = (System.currentTimeMillis() + 2).toString(),
+                    text = "I'm having trouble connecting to my intelligence backend right now.",
+                    sender = "assistant",
+                    timestamp = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date()),
+                )
+                _messages.value = _messages.value + errorMsg
+            } finally {
+                isTyping.value = false
+            }
         }
     }
 
     fun updateFeature(id: String, enabled: Boolean, sensitivity: Int) {
-        features.value = features.value.map {
-            if (it.id == id) it.copy(enabled = enabled, sensitivity = sensitivity) else it
+        viewModelScope.launch {
+            userPreferenceRepository.upsert(
+                skillId = id,
+                autoApprove = enabled,
+                sensitivityLevel = sensitivity,
+            )
         }
     }
 
@@ -199,17 +240,46 @@ class DashboardViewModel @Inject constructor(
             preferencesManager.setOnboardingComplete(true)
         }
     }
+
+    private fun buildSystemPrompt(): String {
+        val skillNames = skillRegistry.skills.joinToString(", ") { it.name }
+        return """
+            |You are ContextOS, an intelligent on-device phone assistant built for proactive context-aware automation.
+            |
+            |Your personality:
+            |• Helpful, concise, and privacy-focused
+            |• You speak in short, clear sentences
+            |• You never share user data externally — everything stays on-device
+            |• You're knowledgeable about the user's registered skills and can explain how they work
+            |
+            |Available skills: $skillNames
+            |
+            |Capabilities:
+            |• You analyze the user's situation (location, calendar, battery, audio context) every 15 minutes
+            |• You can trigger skills like DND before meetings, warn about low battery, launch navigation, draft messages
+            |• You learn from user patterns to make better recommendations over time
+            |• Users can configure skill sensitivity and auto-approval in settings
+            |
+            |Rules:
+            |• Keep responses under 200 words unless the user asks for detail
+            |• If asked about something outside your scope, politely redirect
+            |• Never fabricate sensor data or actions you haven't taken
+            |• Always be transparent about what you can and cannot do
+        """.trimMargin()
+    }
 }
 
 @Composable
 fun DashboardScreen(
     onSettingsClick: () -> Unit,
+    onActionLogClick: () -> Unit = {},
     onActionClick: (Long) -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val messages by viewModel._messages
-    val features by viewModel.features
+    val isTyping by viewModel.isTyping
+    val features by viewModel.features.collectAsState()
     val input = remember { mutableStateOf("") }
     var sidebarOpen by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
@@ -217,14 +287,13 @@ fun DashboardScreen(
     val listState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    LaunchedEffect(Unit) {
-        delay(1000)
-        showPermissions = true
-    }
 
-    LaunchedEffect(messages.size) {
+
+
+    LaunchedEffect(messages.size, isTyping) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            val targetIndex = if (isTyping) messages.size else messages.size - 1
+            listState.animateScrollToItem(targetIndex)
         }
     }
 
@@ -293,6 +362,11 @@ fun DashboardScreen(
                         AiOrbGreeting(message = message)
                     } else {
                         MessageBubble(message = message)
+                    }
+                }
+                if (isTyping) {
+                    item(key = "typing_indicator") {
+                        TypingIndicator()
                     }
                 }
             }
@@ -388,6 +462,10 @@ fun DashboardScreen(
                 onFeatureClick = { feature ->
                     selectedFeature = feature
                     sidebarOpen = false
+                },
+                onActionLogClick = {
+                    sidebarOpen = false
+                    onActionLogClick()
                 },
                 onClose = { sidebarOpen = false },
             )
@@ -630,6 +708,7 @@ private fun MessageBubble(message: ChatMessage) {
 private fun Sidebar(
     features: List<FeatureItem>,
     onFeatureClick: (FeatureItem) -> Unit,
+    onActionLogClick: () -> Unit = {},
     onClose: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
@@ -671,6 +750,56 @@ private fun Sidebar(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 features.forEach { feature ->
                     FeatureCard(feature = feature, onClick = { onFeatureClick(feature) })
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(DividerLine)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(GlassCard, RoundedCornerShape(12.dp))
+                    .border(0.5.dp, Border.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .clickable { onActionLogClick() }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(SurfaceHover, CircleShape)
+                        .border(0.5.dp, Border, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = NeonOrange,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                Column {
+                    Text(
+                        text = "Action History",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextPrimary,
+                    )
+                    Text(
+                        text = "View past agent decisions",
+                        fontSize = 12.sp,
+                        color = TextTertiary,
+                    )
                 }
             }
         }
@@ -981,6 +1110,102 @@ private fun FeatureSettingsSheet(
                     shape = RoundedCornerShape(12.dp),
                 ) {
                     Text(text = "Save", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TypingIndicator() {
+    val dot1Alpha = remember { Animatable(0.3f) }
+    val dot2Alpha = remember { Animatable(0.3f) }
+    val dot3Alpha = remember { Animatable(0.3f) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            dot1Alpha.animateTo(1f, tween(400))
+            dot1Alpha.animateTo(0.3f, tween(400))
+        }
+    }
+    LaunchedEffect(Unit) {
+        delay(150)
+        while (true) {
+            dot2Alpha.animateTo(1f, tween(400))
+            dot2Alpha.animateTo(0.3f, tween(400))
+        }
+    }
+    LaunchedEffect(Unit) {
+        delay(300)
+        while (true) {
+            dot3Alpha.animateTo(1f, tween(400))
+            dot3Alpha.animateTo(0.3f, tween(400))
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.Start,
+    ) {
+        Column(
+            modifier = Modifier.widthIn(max = 280.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(SurfaceHover, CircleShape)
+                        .border(0.5.dp, Border, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Email,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
+                Text(
+                    text = "ContextOS",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextSecondary,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .background(GlassCard, RoundedCornerShape(18.dp))
+                    .border(0.5.dp, BorderLight.copy(alpha = 0.2f), RoundedCornerShape(18.dp))
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .alpha(dot1Alpha.value)
+                            .background(NeonOrange, CircleShape),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .alpha(dot2Alpha.value)
+                            .background(NeonOrange, CircleShape),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .alpha(dot3Alpha.value)
+                            .background(NeonOrange, CircleShape),
+                    )
                 }
             }
         }

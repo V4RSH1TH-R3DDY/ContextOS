@@ -90,4 +90,17 @@ class MockOpenClawAgent @Inject constructor() : OpenClawAgent {
         }
         return anomalies
     }
+
+    override suspend fun chat(history: List<ChatTurn>): String {
+        delay(800)
+        val lastUserMessage = history.lastOrNull { it.role == "user" }?.content ?: ""
+        return when {
+            lastUserMessage.contains("help", ignoreCase = true) ->
+                "I can help you manage your phone proactively! I monitor your calendar, battery, location, and more to take smart actions. Try asking about your skills or preferences."
+            lastUserMessage.contains("skill", ignoreCase = true) ->
+                "You have several skills available: DND Setter, Battery Warner, Navigation Launcher, Message Drafter, Document Fetcher, and Location Intelligence. Each can be configured in the sidebar."
+            else ->
+                "I understand. As your context-aware assistant, I'm always learning your patterns to help you stay ahead. Is there anything specific you'd like me to help with?"
+        }
+    }
 }

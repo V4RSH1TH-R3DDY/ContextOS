@@ -86,7 +86,7 @@ class BatteryWarnerSkill @Inject constructor(
         }
 
         val nextEvent = model.nextCalendarEvent ?: return@withContext SkillResult.Skipped("No calendar event found")
-        val eventDurationHours = String.format("%.1f",
+        val eventDurationHours = String.format(java.util.Locale.US, "%.1f",
             TimeUnit.MILLISECONDS.toMinutes(nextEvent.endTime - nextEvent.startTime) / 60.0)
 
         val message = "Hi $contactName, my phone battery is at ${model.batteryLevel}%. " +
@@ -110,7 +110,7 @@ class BatteryWarnerSkill @Inject constructor(
 
     private fun trySendSms(phone: String, message: String, contactName: String, batteryLevel: Int): SkillResult {
         return try {
-            val smsManager = android.telephony.SmsManager.getDefault()
+            val smsManager = context.getSystemService(android.telephony.SmsManager::class.java)
             smsManager.sendTextMessage(phone, null, message, null, null)
 
             SkillResult.Success(

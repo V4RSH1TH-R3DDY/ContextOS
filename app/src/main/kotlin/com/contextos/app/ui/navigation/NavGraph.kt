@@ -7,6 +7,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.contextos.app.ui.dashboard.ActionLogScreen
 import com.contextos.app.ui.dashboard.DashboardScreen
 import com.contextos.app.ui.detail.ActionDetailScreen
 import com.contextos.app.ui.onboarding.EmergencyContactScreen
@@ -62,9 +63,16 @@ fun ContextOSNavGraph(
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                onActionLogClick = { navController.navigate(Screen.ActionLog.route) },
                 onActionClick = { logId ->
                     navController.navigate(Screen.ActionDetail.createRoute(logId))
                 },
+            )
+        }
+
+        composable(Screen.ActionLog.route) {
+            ActionLogScreen(
+                onBack = { navController.popBackStack() },
             )
         }
 
