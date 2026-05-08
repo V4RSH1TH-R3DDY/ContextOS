@@ -33,7 +33,7 @@ Replace your current Gemini API key in `local.properties`:
 
 ```properties
 sdk.dir=/home/varshith/Android/Sdk
-MAPS_API_KEY=AIzaSyDEyJW1vIWEEBIwdQZkVIfdFxwzE89cI2Y
+MAPS_API_KEY=MAPS_API_KEY_HERE
 OPENCLAW_API_KEY=AIzaSy<YOUR_NEW_KEY_HERE>
 ```
 
