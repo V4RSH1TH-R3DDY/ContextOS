@@ -7,6 +7,19 @@
 ContextOS is an intelligent background agent for Android that learns your patterns, monitors your calendar and surroundings, and autonomously takes helpful actions — like silencing your phone before meetings, drafting "running late" messages, or launching navigation — all without you opening the app.
 
 ---
+🚀 **OpenClaw Project Submission Resources**
+
+📽️ **Demo Video**
+https://youtu.be/eOWGswfy5_E
+
+📊 **Presentation (PPT)**
+https://drive.google.com/file/d/1atIuPmaSxjf7Hp4q1WHjK2hnNPAJlfOY/view?usp=drive_link
+
+📄 **AI Usage Disclosure Form**
+https://docs.google.com/document/d/1bBJrJLVrDFb_3i_MZQCaq8K0KopVKGTx/edit?usp=sharing&ouid=100049560675453548895&rtpof=true&sd=true
+
+✨ Built with ContextOS-powered autonomous intelligence workflows.
+
 
 ## Problem
 
