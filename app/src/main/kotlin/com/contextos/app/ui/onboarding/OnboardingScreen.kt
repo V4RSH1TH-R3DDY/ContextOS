@@ -219,9 +219,6 @@ fun PermissionsScreen(onNext: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(text = "Permissions", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                IconButton(onClick = onNext) {
-                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
-                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -309,35 +306,29 @@ fun GoogleSignInScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         android.util.Log.d("GoogleSignIn", "Result Code: ${result.resultCode}")
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(ApiException::class.java)
-            android.util.Log.d("GoogleSignIn", "Sign in successful: ${account?.email}")
-            if (viewModel.handleSignInSuccess()) {
-                onSignIn()
-            } else {
-                Toast.makeText(context, "Google needs Calendar, Gmail, and Drive access to connect.", Toast.LENGTH_LONG).show()
-            }
-        } catch (e: ApiException) {
-            val statusName = GoogleSignInStatusCodes.getStatusCodeString(e.statusCode)
-            android.util.Log.e(
-                "GoogleSignIn",
-                "Sign-in failed: resultCode=${result.resultCode}, statusCode=${e.statusCode} ($statusName)",
-                e,
-            )
-            if (viewModel.handleSignInSuccess()) {
-                onSignIn()
-            } else {
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                android.util.Log.d("GoogleSignIn", "Sign in successful: ${account?.email}")
+                if (viewModel.handleSignInSuccess()) {
+                    onSignIn()
+                } else {
+                    Toast.makeText(context, "Google needs Calendar, Gmail, and Drive access to connect.", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: ApiException) {
+                val statusName = GoogleSignInStatusCodes.getStatusCodeString(e.statusCode)
+                android.util.Log.e("GoogleSignIn", "Sign-in failed: statusCode=${e.statusCode} ($statusName)", e)
                 val message = if (e.statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED) {
                     "Google sign-in was cancelled."
                 } else {
-                    "Google sign-in failed: $statusName"
+                    "Google sign-in failed ($statusName). You can skip this step and connect later from Settings."
                 }
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                android.util.Log.e("GoogleSignIn", "Sign-in failed.", e)
+                Toast.makeText(context, "Google sign-in failed. You can skip this step and connect later from Settings.", Toast.LENGTH_LONG).show()
             }
-        } catch (e: Exception) {
-            android.util.Log.e("GoogleSignIn", "Sign-in failed.", e)
-            Toast.makeText(context, "Google sign-in failed. Please try again.", Toast.LENGTH_SHORT).show()
         }
     }
 

@@ -1,6 +1,5 @@
 package com.contextos.core.skills
 
-import android.content.Context
 import com.contextos.core.data.db.dao.UserPreferenceDao
 import com.contextos.core.data.model.ActionOutcome
 import com.contextos.core.data.model.DraftingContext
@@ -8,7 +7,6 @@ import com.contextos.core.data.model.SituationModel
 import com.contextos.core.data.repository.ActionLogRepository
 import com.contextos.core.network.MapsDistanceMatrixClient
 import com.contextos.core.data.model.MessageDrafter
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
@@ -17,7 +15,6 @@ import javax.inject.Singleton
 
 @Singleton
 class MessageDrafterSkill @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val actionLogRepository: ActionLogRepository,
     private val userPreferenceDao: UserPreferenceDao,
     private val messageDrafter: MessageDrafter,
@@ -82,30 +79,27 @@ class MessageDrafterSkill @Inject constructor(
         val shouldAutoApprove = userPref?.autoApprove ?: false
 
         return@withContext if (shouldAutoApprove) {
-            trySendSms(draft, recipientName)
+            recordSuccess(recipientName)
         } else {
             SkillResult.PendingConfirmation(
                 description = "Drafted running late message for $recipientName",
                 confirmationMessage = draft,
+                notificationExtras = mapOf(
+                    "message_text" to draft,
+                    "contact_name" to recipientName,
+                    "recipient_name" to recipientName,
+                ),
                 pendingAction = {
-                    trySendSms(draft, recipientName)
+                    recordSuccess(recipientName)
                 }
             )
         }
     }
 
-    private fun trySendSms(message: String, contactName: String): SkillResult {
-        return try {
-            SkillResult.Success(
-                description = "Sent message to $contactName",
-                outcome = ActionOutcome.SUCCESS
-            )
-        } catch (e: Exception) {
-            SkillResult.Failure(
-                description = "Failed to send message: ${e.message}",
-                error = e,
-                outcome = ActionOutcome.FAILURE
-            )
-        }
+    private fun recordSuccess(contactName: String): SkillResult {
+        return SkillResult.Success(
+            description = "Message draft delivered for $contactName",
+            outcome = ActionOutcome.SUCCESS
+        )
     }
 }

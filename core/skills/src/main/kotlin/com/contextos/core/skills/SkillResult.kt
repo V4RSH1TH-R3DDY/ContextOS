@@ -16,6 +16,7 @@ sealed class SkillResult {
     data class PendingConfirmation(
         val description: String,
         val confirmationMessage: String,
+        val notificationExtras: Map<String, String> = emptyMap(),
         val pendingAction: suspend () -> SkillResult,
     ) : SkillResult()
 

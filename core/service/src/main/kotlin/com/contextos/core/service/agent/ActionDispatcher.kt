@@ -8,6 +8,7 @@ import com.contextos.core.data.model.ReasoningPayload
 import com.contextos.core.data.model.SituationModel
 import com.contextos.core.data.repository.ActionLogRepository
 import com.contextos.core.service.ReasoningBuilder
+import com.contextos.core.service.notifications.ContextOSNotificationManager
 import com.contextos.core.skills.Skill
 import com.contextos.core.skills.SkillResult
 import kotlinx.serialization.encodeToString
@@ -28,6 +29,7 @@ import javax.inject.Singleton
 class ActionDispatcher @Inject constructor(
     private val userPreferenceDao:  UserPreferenceDao,
     private val actionLogRepository: ActionLogRepository,
+    private val notificationManager: ContextOSNotificationManager,
 ) {
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -82,7 +84,7 @@ class ActionDispatcher @Inject constructor(
                     dispatch(skill, innerResult, model, confidence)  // recurse with the real result
                 } else {
                     Log.i(TAG, "[${skill.id}] Pending user confirmation — ${result.confirmationMessage}")
-                    log(
+                    val actionLogId = log(
                         now              = nowMs,
                         skill            = skill,
                         description      = result.confirmationMessage,
@@ -91,6 +93,7 @@ class ActionDispatcher @Inject constructor(
                         situationJson    = situationJson,
                         reasoningJson    = reasoningJson,
                     )
+                    showNotification(skill.id, result, actionLogId)
                 }
             }
 
@@ -134,8 +137,8 @@ class ActionDispatcher @Inject constructor(
         wasAutoApproved: Boolean,
         situationJson:   String,
         reasoningJson:   String = "{}",
-    ) {
-        try {
+    ): Long {
+        return try {
             actionLogRepository.insert(
                 ActionLogEntity(
                     timestampMs       = now,
@@ -151,6 +154,7 @@ class ActionDispatcher @Inject constructor(
             )
         } catch (e: Exception) {
             Log.w(TAG, "Failed to persist ActionLogEntity for ${skill.id}", e)
+            -1L
         }
     }
 
@@ -172,7 +176,55 @@ class ActionDispatcher @Inject constructor(
         }
     }
 
+    private fun showNotification(skillId: String, result: SkillResult.PendingConfirmation, actionLogId: Long) {
+        if (actionLogId < 0L) return
+
+        val title = when (skillId) {
+            "battery_warner" -> "Low Battery"
+            "message_drafter" -> "Message Draft"
+            "navigation_launcher" -> "Navigation"
+            else -> "ContextOS Action"
+        }
+
+        val extras = result.notificationExtras
+
+        when (skillId) {
+            "message_drafter" -> {
+                notificationManager.showMessageDraftNotification(
+                    notificationId = NOTIFICATION_ID_BASE + (actionLogId % NOTIFICATION_ID_BASE).toInt(),
+                    title = title,
+                    body = result.confirmationMessage,
+                    draftText = result.confirmationMessage,
+                    skillId = skillId,
+                    actionLogId = actionLogId,
+                    extras = extras,
+                )
+            }
+            "battery_warner" -> {
+                notificationManager.showBatteryWarningNotification(
+                    notificationId = NOTIFICATION_ID_BASE + (actionLogId % NOTIFICATION_ID_BASE).toInt(),
+                    title = title,
+                    body = result.confirmationMessage,
+                    skillId = skillId,
+                    actionLogId = actionLogId,
+                    extras = extras,
+                )
+            }
+            else -> {
+                notificationManager.showApprovalNotification(
+                    notificationId = NOTIFICATION_ID_BASE + (actionLogId % NOTIFICATION_ID_BASE).toInt(),
+                    title = title,
+                    body = result.confirmationMessage,
+                    skillId = skillId,
+                    actionLogId = actionLogId,
+                    extras = extras,
+                )
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "ActionDispatcher"
+        private const val NOTIFICATION_ID_BASE = 10_000
     }
 }

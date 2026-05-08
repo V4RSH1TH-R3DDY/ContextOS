@@ -119,6 +119,10 @@ class NavigationLauncherSkill @Inject constructor(
             SkillResult.PendingConfirmation(
                 description = prompt,
                 confirmationMessage = "Open Google Maps for navigation to $location?",
+                notificationExtras = mapOf(
+                    "location" to location,
+                    "event_title" to (event.title ?: "Meeting"),
+                ),
                 pendingAction = {
                     try {
                         launchNavigation(location)

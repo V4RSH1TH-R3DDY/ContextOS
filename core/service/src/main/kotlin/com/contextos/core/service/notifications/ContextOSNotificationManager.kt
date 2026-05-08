@@ -128,18 +128,21 @@ class ContextOSNotificationManager @Inject constructor(
         body: String,
         skillId: String,
         actionLogId: Long,
+        extras: Map<String, String> = emptyMap(),
     ): Notification {
         val approveIntent = createActionIntent(
             action = "ACTION_APPROVE",
             skillId = skillId,
             actionLogId = actionLogId,
             requestCode = REQUEST_CODE_APPROVE + notificationId,
+            extras = extras,
         )
         val dismissIntent = createActionIntent(
             action = "ACTION_DISMISS",
             skillId = skillId,
             actionLogId = actionLogId,
             requestCode = REQUEST_CODE_DISMISS + notificationId,
+            extras = extras,
         )
 
         return NotificationCompat.Builder(context, CHANNEL_ID_APPROVAL)
@@ -168,11 +171,12 @@ class ContextOSNotificationManager @Inject constructor(
         body: String,
         skillId: String,
         actionLogId: Long,
+        extras: Map<String, String> = emptyMap(),
     ) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.notify(
             notificationId,
-            buildApprovalNotification(notificationId, title, body, skillId, actionLogId),
+            buildApprovalNotification(notificationId, title, body, skillId, actionLogId, extras),
         )
     }
 
@@ -185,12 +189,14 @@ class ContextOSNotificationManager @Inject constructor(
         draftText: String,
         skillId: String,
         actionLogId: Long,
+        extras: Map<String, String> = emptyMap(),
     ): Notification {
         val sendIntent = createActionIntent(
             action = "ACTION_SEND_MESSAGE",
             skillId = skillId,
             actionLogId = actionLogId,
             requestCode = REQUEST_CODE_SEND + notificationId,
+            extras = extras,
         )
 
         return NotificationCompat.Builder(context, CHANNEL_ID_MESSAGE)
@@ -231,11 +237,12 @@ class ContextOSNotificationManager @Inject constructor(
         draftText: String,
         skillId: String,
         actionLogId: Long,
+        extras: Map<String, String> = emptyMap(),
     ) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.notify(
             notificationId,
-            buildMessageDraftNotification(notificationId, title, body, draftText, skillId, actionLogId),
+            buildMessageDraftNotification(notificationId, title, body, draftText, skillId, actionLogId, extras),
         )
     }
 
@@ -287,12 +294,14 @@ class ContextOSNotificationManager @Inject constructor(
         body: String,
         skillId: String,
         actionLogId: Long,
+        extras: Map<String, String> = emptyMap(),
     ): Notification {
         val sendIntent = createActionIntent(
             action = "ACTION_SEND_BATTERY_WARNING",
             skillId = skillId,
             actionLogId = actionLogId,
             requestCode = REQUEST_CODE_SEND + notificationId,
+            extras = extras,
         )
         val skipIntent = createActionIntent(
             action = "ACTION_DISMISS",
@@ -327,11 +336,12 @@ class ContextOSNotificationManager @Inject constructor(
         body: String,
         skillId: String,
         actionLogId: Long,
+        extras: Map<String, String> = emptyMap(),
     ) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.notify(
             notificationId,
-            buildBatteryWarningNotification(notificationId, title, body, skillId, actionLogId),
+            buildBatteryWarningNotification(notificationId, title, body, skillId, actionLogId, extras),
         )
     }
 
@@ -382,11 +392,13 @@ class ContextOSNotificationManager @Inject constructor(
         skillId: String,
         actionLogId: Long,
         requestCode: Int,
+        extras: Map<String, String> = emptyMap(),
     ): PendingIntent {
         val intent = Intent(context, NotificationActionReceiver::class.java).apply {
             this.action = action
             putExtra("skill_id", skillId)
             putExtra("action_log_id", actionLogId)
+            extras.forEach { (key, value) -> putExtra(key, value) }
         }
         return PendingIntent.getBroadcast(
             context,

@@ -9,11 +9,14 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.client.util.DateTime
 import com.google.api.services.calendar.Calendar
+import com.google.api.services.calendar.model.Event
+import com.google.api.services.calendar.model.EventDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -205,6 +208,129 @@ class CalendarApiClient @Inject constructor(
                 CalendarSyncResult.empty()
             }
         }
+
+    // ─── Write Operations ────────────────────────────────────────────────────
+
+    /**
+     * Creates a new calendar event on the primary calendar.
+     *
+     * @param summary  Event title (required).
+     * @param startTimeIso  Start time in ISO 8601, e.g. "2026-05-08T19:30:00".
+     * @param endTimeIso  End time in ISO 8601, e.g. "2026-05-08T20:30:00".
+     * @param description  Optional description.
+     * @param location  Optional physical location.
+     * @return The created Event (including id) or null on failure.
+     */
+    suspend fun createEvent(
+        summary: String,
+        startTimeIso: String,
+        endTimeIso: String,
+        description: String? = null,
+        location: String? = null,
+    ): Event? = withContext(Dispatchers.IO) {
+        val service = buildService()
+            ?: return@withContext null.also {
+                Log.w(TAG, "createEvent: not signed in")
+            }
+
+        try {
+            retryWithBackoff(tag = TAG) {
+                val event = Event()
+                    .setSummary(summary)
+                    .setDescription(description)
+                    .setLocation(location)
+                    .setStart(EventDateTime()
+                        .setDateTime(DateTime(startTimeIso))
+                        .setTimeZone(TimeZone.getDefault().id))
+                    .setEnd(EventDateTime()
+                        .setDateTime(DateTime(endTimeIso))
+                        .setTimeZone(TimeZone.getDefault().id))
+
+                service.events().insert("primary", event)
+                    .setFields("id,summary,description,location,start,end,htmlLink")
+                    .execute()
+            }
+        } catch (e: UserRecoverableAuthIOException) {
+            Log.w(TAG, "User needs to re-authorize Calendar access", e)
+            preferencesManager.setGoogleReauthRequired(true)
+            null
+        } catch (e: IOException) {
+            Log.e(TAG, "Failed to create calendar event after retries", e)
+            null
+        }
+    }
+
+    /**
+     * Updates an existing calendar event. Only non-null fields are changed.
+     */
+    suspend fun updateEvent(
+        eventId: String,
+        summary: String? = null,
+        startTimeIso: String? = null,
+        endTimeIso: String? = null,
+        description: String? = null,
+        location: String? = null,
+    ): Event? = withContext(Dispatchers.IO) {
+        val service = buildService()
+            ?: return@withContext null.also {
+                Log.w(TAG, "updateEvent: not signed in")
+            }
+
+        try {
+            retryWithBackoff(tag = TAG) {
+                val event = Event()
+                summary?.let { event.setSummary(it) }
+                description?.let { event.setDescription(it) }
+                location?.let { event.setLocation(it) }
+                startTimeIso?.let {
+                    event.setStart(EventDateTime()
+                        .setDateTime(DateTime(it))
+                        .setTimeZone(TimeZone.getDefault().id))
+                }
+                endTimeIso?.let {
+                    event.setEnd(EventDateTime()
+                        .setDateTime(DateTime(it))
+                        .setTimeZone(TimeZone.getDefault().id))
+                }
+
+                service.events().update("primary", eventId, event)
+                    .setFields("id,summary,description,location,start,end,htmlLink")
+                    .execute()
+            }
+        } catch (e: UserRecoverableAuthIOException) {
+            Log.w(TAG, "User needs to re-authorize Calendar access", e)
+            preferencesManager.setGoogleReauthRequired(true)
+            null
+        } catch (e: IOException) {
+            Log.e(TAG, "Failed to update calendar event after retries", e)
+            null
+        }
+    }
+
+    /**
+     * Deletes a calendar event by ID.
+     * @return true if deleted, false on failure.
+     */
+    suspend fun deleteEvent(eventId: String): Boolean = withContext(Dispatchers.IO) {
+        val service = buildService()
+            ?: return@withContext false.also {
+                Log.w(TAG, "deleteEvent: not signed in")
+            }
+
+        try {
+            retryWithBackoff(tag = TAG) {
+                service.events().delete("primary", eventId).execute()
+                true
+            }
+        } catch (e: UserRecoverableAuthIOException) {
+            Log.w(TAG, "User needs to re-authorize Calendar access", e)
+            preferencesManager.setGoogleReauthRequired(true)
+            false
+        } catch (e: IOException) {
+            Log.e(TAG, "Failed to delete calendar event after retries", e)
+            false
+        }
+    }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
 

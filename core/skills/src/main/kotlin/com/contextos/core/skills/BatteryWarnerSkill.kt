@@ -1,12 +1,10 @@
 package com.contextos.core.skills
 
-import android.content.Context
 import com.contextos.core.data.preferences.PreferencesManager
 import com.contextos.core.data.db.dao.UserPreferenceDao
 import com.contextos.core.data.model.ActionOutcome
 import com.contextos.core.data.model.SituationModel
 import com.contextos.core.data.repository.ActionLogRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -15,7 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Battery Warner skill — warns an emergency contact when battery is critically low
+ * Battery Warner skill — shows a system notification when battery is critically low
  * and the user has a long meeting ahead.
  *
  * Trigger conditions:
@@ -24,13 +22,12 @@ import javax.inject.Singleton
  *  - Has not triggered successfully in the last 2 hours (debounce)
  *
  * Execution:
- *  - Composes a pre-drafted SMS message
- *  - If auto-approve is enabled, sends SMS directly via SmsManager
- *  - Otherwise returns PendingConfirmation with the message for user approval
+ *  - Composes a warning message
+ *  - If auto-approve is enabled, records success (notification was the delivery)
+ *  - Otherwise returns PendingConfirmation with the message for user review
  */
 @Singleton
 class BatteryWarnerSkill @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val preferencesManager: PreferencesManager,
     private val actionLogRepository: ActionLogRepository,
     private val userPreferenceDao: UserPreferenceDao,
@@ -91,40 +88,29 @@ class BatteryWarnerSkill @Inject constructor(
         val shouldAutoApprove = userPref?.autoApprove ?: false
 
         return@withContext if (shouldAutoApprove) {
-            trySendSms(contactPhone, message, contactName, model.batteryLevel)
+            notifySuccess(contactName, model.batteryLevel)
         } else {
             SkillResult.PendingConfirmation(
-                description = "Send low-battery warning SMS to $contactName",
+                description = "Low battery warning for $contactName",
                 confirmationMessage = message,
+                notificationExtras = mapOf(
+                    "emergency_contact_phone" to contactPhone,
+                    "emergency_contact_name" to contactName,
+                    "battery_level" to model.batteryLevel.toString(),
+                    "message_text" to message,
+                ),
                 pendingAction = {
-                    trySendSms(contactPhone, message, contactName, model.batteryLevel)
+                    notifySuccess(contactName, model.batteryLevel)
                 },
             )
         }
     }
 
-    private fun trySendSms(phone: String, message: String, contactName: String, batteryLevel: Int): SkillResult {
-        return try {
-            val smsManager = context.getSystemService(android.telephony.SmsManager::class.java)
-            smsManager.sendTextMessage(phone, null, message, null, null)
-
-            SkillResult.Success(
-                description = "Sent battery warning SMS to $contactName ($batteryLevel%)",
-                outcome = ActionOutcome.SUCCESS,
-            )
-        } catch (e: SecurityException) {
-            SkillResult.Failure(
-                description = "SMS permission not granted",
-                error = e,
-                outcome = ActionOutcome.FAILURE,
-            )
-        } catch (e: Exception) {
-            SkillResult.Failure(
-                description = "Failed to send SMS: ${e.message}",
-                error = e,
-                outcome = ActionOutcome.FAILURE,
-            )
-        }
+    private fun notifySuccess(contactName: String, batteryLevel: Int): SkillResult {
+        return SkillResult.Success(
+            description = "Battery warning delivered for $contactName ($batteryLevel%)",
+            outcome = ActionOutcome.SUCCESS,
+        )
     }
 
     companion object {
