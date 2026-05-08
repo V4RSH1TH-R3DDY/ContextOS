@@ -164,3 +164,22 @@
 -dontwarn java.lang.invoke.*
 -dontwarn javax.annotation.**
 -dontwarn org.codehaus.mojo.animal_sniffer.*
+
+# ─────────────────────────────────────────────
+# Apache HTTP Client (legacy, kept for compatibility)
+# ─────────────────────────────────────────────
+-keep class org.apache.http.** { *; }
+-keep interface org.apache.http.** { *; }
+-dontwarn org.apache.http.**
+-keep class org.apache.commons.** { *; }
+-dontwarn org.apache.commons.**
+
+# ─────────────────────────────────────────────
+# JNDI and GSS classes (used by SSL verification)
+# ─────────────────────────────────────────────
+-keep class javax.naming.** { *; }
+-keep class javax.naming.directory.** { *; }
+-keep class javax.naming.ldap.** { *; }
+-keep class org.ietf.jgss.** { *; }
+-dontwarn javax.naming.**
+-dontwarn org.ietf.jgss.**

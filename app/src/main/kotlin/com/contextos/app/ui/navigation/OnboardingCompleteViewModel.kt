@@ -18,11 +18,9 @@ class OnboardingCompleteViewModel @Inject constructor(
         }
     }
 
-    fun saveEmergencyContact(name: String, phone: String, relationship: String) {
+    fun saveEmergencyContacts(contacts: List<PreferencesManager.EmergencyContact>) {
         viewModelScope.launch {
-            preferencesManager.saveEmergencyContact(
-                PreferencesManager.EmergencyContact(name, phone, relationship)
-            )
+            preferencesManager.saveEmergencyContacts(contacts)
         }
     }
 }

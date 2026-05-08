@@ -46,11 +46,11 @@ class GoogleAuthManager @Inject constructor(
 
     private val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
         .requestEmail()
-        // .requestScopes(
-        //     Scope(SCOPE_CALENDAR),
-        //     Scope(SCOPE_GMAIL),
-        //     Scope(SCOPE_DRIVE),
-        // )
+        .requestScopes(
+            Scope(SCOPE_CALENDAR),
+            Scope(SCOPE_GMAIL),
+            Scope(SCOPE_DRIVE),
+        )
         .build()
 
     /** Use this client to launch the sign-in Intent from any Activity/Fragment. */
@@ -77,6 +77,13 @@ class GoogleAuthManager @Inject constructor(
             Scope(SCOPE_GMAIL),
             Scope(SCOPE_DRIVE),
         )
+    }
+
+    /** Returns the signed-in account email only when all required scopes exist. */
+    fun getConnectedAccountEmail(): String? {
+        val account = getCurrentAccount() ?: return null
+        if (!hasRequiredScopes()) return null
+        return account.email ?: account.account?.name
     }
 
     // ─── Credential / token ───────────────────────────────────────────────────
@@ -177,9 +184,9 @@ class GoogleAuthManager @Inject constructor(
     companion object {
         private const val TAG = "GoogleAuthManager"
 
-        const val SCOPE_CALENDAR = "https://www.googleapis.com/auth/calendar.readonly"
-        const val SCOPE_GMAIL    = "https://www.googleapis.com/auth/gmail.readonly"
-        const val SCOPE_DRIVE    = "https://www.googleapis.com/auth/drive.readonly"
+        const val SCOPE_CALENDAR = "https://www.googleapis.com/auth/calendar"
+        const val SCOPE_GMAIL    = "https://www.googleapis.com/auth/gmail.modify"
+        const val SCOPE_DRIVE    = "https://www.googleapis.com/auth/drive"
 
         val ALL_SCOPES = listOf(SCOPE_CALENDAR, SCOPE_GMAIL, SCOPE_DRIVE)
     }

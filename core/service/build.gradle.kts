@@ -8,6 +8,7 @@ val localProperties = Properties().apply {
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
@@ -21,13 +22,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
         
-        buildConfigField("String", "OPENCLAW_API_KEY", "\"${localProperties.getProperty("OPENCLAW_API_KEY", "")}\"")
-        buildConfigField("String", "OPENCLAW_API_ENDPOINT", "\"https://generativelanguage.googleapis.com/v1beta/models\"")
+        val apiKey = localProperties.getProperty("OPENCLAW_API_KEY", "")
+        val isGroqKey = apiKey.startsWith("gsk_")
+        val defaultModel = if (isGroqKey) "openai/gpt-oss-120b" else "qwen/qwen3-32b"
+        val apiEndpoint = if (isGroqKey) "https://api.groq.com/openai/v1" else "https://generativelanguage.googleapis.com/v1beta/models"
+        
+        buildConfigField("String", "OPENCLAW_API_KEY", "\"$apiKey\"")
+        buildConfigField("String", "OPENCLAW_API_ENDPOINT", "\"$apiEndpoint\"")
+        buildConfigField("String", "OPENCLAW_API_PROVIDER", "\"${if (isGroqKey) "groq" else "gemini"}\"")
         buildConfigField("boolean", "OPENCLAW_ENABLE_REASONING", localProperties.getProperty("OPENCLAW_ENABLE_REASONING", "true"))
         buildConfigField("boolean", "OPENCLAW_ENABLE_DRAFTING", localProperties.getProperty("OPENCLAW_ENABLE_DRAFTING", "true"))
-        buildConfigField("String", "OPENCLAW_REASONING_MODEL", "\"${localProperties.getProperty("OPENCLAW_REASONING_MODEL", "gemini-2.0-flash")}\"")
-        buildConfigField("String", "OPENCLAW_DRAFTING_MODEL", "\"${localProperties.getProperty("OPENCLAW_DRAFTING_MODEL", "gemini-2.0-flash-lite")}\"")
-        buildConfigField("String", "OPENCLAW_CHAT_MODEL", "\"${localProperties.getProperty("OPENCLAW_CHAT_MODEL", "gemini-2.0-flash")}\"")
+        buildConfigField("String", "OPENCLAW_REASONING_MODEL", "\"${localProperties.getProperty("OPENCLAW_REASONING_MODEL", defaultModel)}\"")
+        buildConfigField("String", "OPENCLAW_DRAFTING_MODEL", "\"${localProperties.getProperty("OPENCLAW_DRAFTING_MODEL", defaultModel)}\"")
+        buildConfigField("String", "OPENCLAW_CHAT_MODEL", "\"${localProperties.getProperty("OPENCLAW_CHAT_MODEL", defaultModel)}\"")
+        buildConfigField("boolean", "OPENCLAW_USE_MOCK", localProperties.getProperty("OPENCLAW_USE_MOCK", "false"))
     }
 
     buildFeatures {

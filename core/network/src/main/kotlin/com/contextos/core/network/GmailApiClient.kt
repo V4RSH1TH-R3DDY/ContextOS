@@ -1,6 +1,7 @@
 package com.contextos.core.network
 
 import android.util.Log
+import com.contextos.core.data.preferences.PreferencesManager
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
@@ -20,12 +21,13 @@ import javax.inject.Singleton
  * costs ~5 units, so 4 calls per cycle × 96 cycles/day ≈ 1,920 units — well
  * within budget.
  *
- * Phase 0.2 delivers: an authenticated call that can list recent inbox messages.
- * Full message-parsing logic (for context-aware drafts) is added in Phase 3.5.
+ * Returns hydrated message metadata/snippets so downstream context can show
+ * subjects, senders, dates, snippets, and stable Gmail deep links.
  */
 @Singleton
 class GmailApiClient @Inject constructor(
     private val authManager: GoogleAuthManager,
+    private val preferencesManager: PreferencesManager,
 ) {
 
     // ─── Service builder ─────────────────────────────────────────────────────
@@ -55,16 +57,18 @@ class GmailApiClient @Inject constructor(
 
             try {
                 retryWithBackoff(tag = TAG) {
-                    service.users().messages().list(USER_ME)
+                    val messageRefs = service.users().messages().list(USER_ME)
                         .setMaxResults(maxResults)
                         .setLabelIds(listOf(LABEL_INBOX))
-                        .setFields("messages(id,threadId,snippet,labelIds)")
+                        .setFields("messages(id,threadId),nextPageToken")
                         .execute()
                         .messages
                         ?: emptyList()
+                    hydrateMessages(service, messageRefs)
                 }
             } catch (e: UserRecoverableAuthIOException) {
                 Log.w(TAG, "User needs to re-authorize Gmail access", e)
+                preferencesManager.setGoogleReauthRequired(true)
                 emptyList()
             } catch (e: IOException) {
                 Log.e(TAG, "Failed to fetch Gmail messages after retries", e)
@@ -85,16 +89,18 @@ class GmailApiClient @Inject constructor(
 
             try {
                 retryWithBackoff(tag = TAG) {
-                    service.users().messages().list(USER_ME)
+                    val messageRefs = service.users().messages().list(USER_ME)
                         .setQ(query)
                         .setMaxResults(maxResults)
-                        .setFields("messages(id,threadId,snippet,labelIds)")
+                        .setFields("messages(id,threadId),nextPageToken")
                         .execute()
                         .messages
                         ?: emptyList()
+                    hydrateMessages(service, messageRefs)
                 }
             } catch (e: UserRecoverableAuthIOException) {
                 Log.w(TAG, "User needs to re-authorize Gmail access", e)
+                preferencesManager.setGoogleReauthRequired(true)
                 emptyList()
             } catch (e: IOException) {
                 Log.e(TAG, "Failed to search Gmail messages after retries", e)
@@ -103,8 +109,7 @@ class GmailApiClient @Inject constructor(
         }
 
     /**
-     * Fetches the full content of a single message by [messageId].
-     * Used by Phase 3.5 (LLM Message Drafting) to read message bodies.
+     * Fetches readable metadata and snippet for a single message by [messageId].
      *
      * Returns null if the message cannot be fetched.
      */
@@ -118,16 +123,29 @@ class GmailApiClient @Inject constructor(
                     service.users().messages().get(USER_ME, messageId)
                         .setFormat("metadata")
                         .setMetadataHeaders(listOf("From", "To", "Subject", "Date"))
+                        .setFields("id,threadId,snippet,labelIds,payload/headers")
                         .execute()
                 }
             } catch (e: UserRecoverableAuthIOException) {
                 Log.w(TAG, "User needs to re-authorize Gmail access", e)
+                preferencesManager.setGoogleReauthRequired(true)
                 null
             } catch (e: IOException) {
                 Log.e(TAG, "Failed to fetch message $messageId after retries", e)
                 null
             }
         }
+
+    private fun hydrateMessages(service: Gmail, messageRefs: List<Message>): List<Message> {
+        return messageRefs.mapNotNull { messageRef ->
+            val id = messageRef.id ?: return@mapNotNull null
+            service.users().messages().get(USER_ME, id)
+                .setFormat("metadata")
+                .setMetadataHeaders(listOf("From", "To", "Subject", "Date"))
+                .setFields("id,threadId,snippet,labelIds,payload/headers")
+                .execute()
+        }
+    }
 
     // ─── Constants ───────────────────────────────────────────────────────────
 

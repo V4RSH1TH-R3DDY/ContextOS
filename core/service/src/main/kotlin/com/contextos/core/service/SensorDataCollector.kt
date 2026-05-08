@@ -1,5 +1,7 @@
 package com.contextos.core.service
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -287,11 +289,13 @@ class SensorDataCollector @Inject constructor(
         var isMobileDataConnected      = false
 
         try {
-            val wm = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val wifiInfo = wm.connectionInfo
-            val rawSsid  = wifiInfo?.ssid
-            // Android wraps SSID in quotes — strip them
-            wifiSsid = rawSsid?.removeSurrounding("\"")?.takeIf { it != "<unknown ssid>" }
+            if (context.checkSelfPermission(Manifest.permission.ACCESS_WIFI_STATE) == PackageManager.PERMISSION_GRANTED) {
+                val wm = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                val wifiInfo = wm.connectionInfo
+                val rawSsid  = wifiInfo?.ssid
+                // Android wraps SSID in quotes — strip them
+                wifiSsid = rawSsid?.removeSurrounding("\"")?.takeIf { it != "<unknown ssid>" }
+            }
         } catch (e: Exception) {
             Log.w(TAG, "WiFi SSID collection failed", e)
         }

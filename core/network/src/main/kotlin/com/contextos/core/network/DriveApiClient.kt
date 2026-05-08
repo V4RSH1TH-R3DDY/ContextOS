@@ -1,6 +1,7 @@
 package com.contextos.core.network
 
 import android.util.Log
+import com.contextos.core.data.preferences.PreferencesManager
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
@@ -26,6 +27,7 @@ import javax.inject.Singleton
 @Singleton
 class DriveApiClient @Inject constructor(
     private val authManager: GoogleAuthManager,
+    private val preferencesManager: PreferencesManager,
 ) {
 
     // ─── Service builder ─────────────────────────────────────────────────────
@@ -65,6 +67,7 @@ class DriveApiClient @Inject constructor(
                 }
             } catch (e: UserRecoverableAuthIOException) {
                 Log.w(TAG, "User needs to re-authorize Drive access", e)
+                preferencesManager.setGoogleReauthRequired(true)
                 emptyList()
             } catch (e: IOException) {
                 Log.e(TAG, "Failed to list Drive files after retries", e)
@@ -98,6 +101,7 @@ class DriveApiClient @Inject constructor(
                 }
             } catch (e: UserRecoverableAuthIOException) {
                 Log.w(TAG, "User needs to re-authorize Drive access", e)
+                preferencesManager.setGoogleReauthRequired(true)
                 emptyList()
             } catch (e: IOException) {
                 Log.e(TAG, "Failed to search Drive files after retries", e)

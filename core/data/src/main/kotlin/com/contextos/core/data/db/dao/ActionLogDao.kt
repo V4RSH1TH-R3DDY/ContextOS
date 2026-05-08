@@ -30,4 +30,7 @@ interface ActionLogDao {
 
     @Query("SELECT COUNT(*) FROM action_log WHERE skillId = :skillId AND timestampMs >= :sinceMs AND userOverride = 'DISMISSED'")
     suspend fun countDismissalsSince(skillId: String, sinceMs: Long): Int
+
+    @Query("UPDATE action_log SET userOverride = :userOverride WHERE id = :id")
+    suspend fun updateUserOverride(id: Long, userOverride: String): Int
 }

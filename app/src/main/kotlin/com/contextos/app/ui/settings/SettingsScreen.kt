@@ -1,5 +1,6 @@
 package com.contextos.app.ui.settings
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,7 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
@@ -44,11 +45,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.navigation.compose.hiltViewModel
-import android.app.Activity
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.contextos.core.network.CalendarSyncWorker
 import com.contextos.core.network.GoogleAuthManager
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
+import com.google.android.gms.common.api.ApiException
 import com.contextos.app.ui.theme.Background
 import com.contextos.app.ui.theme.DividerLine
 import com.contextos.app.ui.theme.Accent
@@ -61,6 +65,7 @@ import com.contextos.app.ui.theme.TextTertiary
 import com.contextos.core.data.preferences.PreferencesManager
 import com.contextos.core.data.repository.UserPreferenceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -79,13 +84,13 @@ data class SkillSettingItem(
 data class SettingsUiState(
     val skills: List<SkillSettingItem>,
     val behavior: String,
-    val emergencyContactName: String,
-    val emergencyContactPhone: String,
+    val emergencyContacts: List<PreferencesManager.EmergencyContact>,
     val googleAccountEmail: String?,
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val preferenceRepository: UserPreferenceRepository,
     private val preferencesManager: PreferencesManager,
     private val googleAuthManager: GoogleAuthManager,
@@ -94,9 +99,9 @@ class SettingsViewModel @Inject constructor(
 
     val state: StateFlow<SettingsUiState> = combine(
         preferenceRepository.getAll(),
-        preferencesManager.emergencyContact,
+        preferencesManager.emergencyContacts,
         preferencesManager.googleAccountEmail,
-    ) { dbPrefs, contact, email ->
+    ) { dbPrefs, contacts, email ->
         val skills = skillRegistry.skills.map { skill ->
             val dbPref = dbPrefs.find { it.skillId == skill.id }
             SkillSettingItem(
@@ -110,8 +115,7 @@ class SettingsViewModel @Inject constructor(
         SettingsUiState(
             skills = skills,
             behavior = if (dbPrefs.all { it.autoApprove }) "auto" else "confirm",
-            emergencyContactName = contact?.name ?: "John Doe",
-            emergencyContactPhone = contact?.phone ?: "",
+            emergencyContacts = contacts,
             googleAccountEmail = email,
         )
     }.stateIn(
@@ -120,11 +124,14 @@ class SettingsViewModel @Inject constructor(
         initialValue = SettingsUiState(
             skills = emptyList(),
             behavior = "confirm",
-            emergencyContactName = "John Doe",
-            emergencyContactPhone = "",
-            googleAccountEmail = "john@gmail.com",
+            emergencyContacts = emptyList(),
+            googleAccountEmail = null,
         ),
     )
+
+    init {
+        syncGoogleConnectionState()
+    }
 
     fun toggleSkill(skillId: String, enabled: Boolean) {
         viewModelScope.launch {
@@ -145,23 +152,49 @@ class SettingsViewModel @Inject constructor(
 
     fun setBehavior(behavior: String) {
         viewModelScope.launch {
-            preferenceRepository.getAll()
+            val autoApprove = behavior == "auto"
+            skillRegistry.skills.forEach { skill ->
+                val current = preferenceRepository.getBySkillId(skill.id)
+                preferenceRepository.upsert(
+                    skillId = skill.id,
+                    autoApprove = autoApprove,
+                    sensitivityLevel = current?.sensitivityLevel ?: 1,
+                )
+            }
+        }
+    }
+
+    fun updateEmergencyContact(name: String, phone: String) {
+        viewModelScope.launch {
+            preferencesManager.saveEmergencyContact(
+                PreferencesManager.EmergencyContact(
+                    name = name,
+                    phone = phone,
+                    relationship = "Emergency Contact",
+                )
+            )
         }
     }
 
     fun getSignInIntent() = googleAuthManager.signInClient.signInIntent
 
-    fun handleSignInSuccess(fallbackEmail: String? = null) {
+    fun syncGoogleConnectionState() {
+        val email = googleAuthManager.getConnectedAccountEmail()
         viewModelScope.launch {
-            val account = googleAuthManager.getCurrentAccount()
-            if (account != null) {
-                preferencesManager.setGoogleAccountEmail(account.email)
-            } else if (fallbackEmail != null) {
-                preferencesManager.setGoogleAccountEmail(fallbackEmail)
-            } else {
-                preferencesManager.setGoogleAccountEmail("user@gmail.com")
+            preferencesManager.setGoogleAccountEmail(email)
+        }
+    }
+
+    fun handleSignInSuccess(): Boolean {
+        val email = googleAuthManager.getConnectedAccountEmail()
+        viewModelScope.launch {
+            preferencesManager.setGoogleAccountEmail(email)
+            if (email != null) {
+                preferencesManager.setGoogleReauthRequired(false)
+                CalendarSyncWorker.schedule(appContext)
             }
         }
+        return email != null
     }
 
     fun deleteAccount() {
@@ -170,6 +203,7 @@ class SettingsViewModel @Inject constructor(
             googleAuthManager.revokeAccess()
             preferencesManager.clearEmergencyContact()
             preferencesManager.setGoogleAccountEmail(null)
+            preferencesManager.setGoogleReauthRequired(false)
             preferencesManager.setOnboardingComplete(false)
         }
     }
@@ -178,6 +212,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             googleAuthManager.signOut()
             preferencesManager.setGoogleAccountEmail(null)
+            preferencesManager.setGoogleReauthRequired(false)
         }
     }
 
@@ -186,6 +221,7 @@ class SettingsViewModel @Inject constructor(
             googleAuthManager.signOut()
             preferencesManager.clearEmergencyContact()
             preferencesManager.setGoogleAccountEmail(null)
+            preferencesManager.setGoogleReauthRequired(false)
         }
     }
 }
@@ -195,24 +231,48 @@ fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val state by viewModel.state.collectAsState()
     var behavior by remember { mutableStateOf(state.behavior) }
+    var showEditEmergencyContact by remember { mutableStateOf(false) }
+    var emergencyContactName by remember { mutableStateOf("") }
+    var emergencyContactPhone by remember { mutableStateOf("") }
+
+    // Initialize emergency contact fields from state
+    if (state.emergencyContacts.isNotEmpty()) {
+        val contact = state.emergencyContacts.first()
+        if (emergencyContactName.isEmpty()) {
+            emergencyContactName = contact.name
+            emergencyContactPhone = contact.phone
+        }
+    }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val fallbackEmail = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            try {
-                task.getResult(com.google.android.gms.common.api.ApiException::class.java)
-                viewModel.handleSignInSuccess()
-            } catch (e: Exception) {
-                viewModel.handleSignInSuccess(fallbackEmail)
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            task.getResult(ApiException::class.java)
+            if (!viewModel.handleSignInSuccess()) {
+                Toast.makeText(context, "Google needs Calendar, Gmail, and Drive access to connect.", Toast.LENGTH_LONG).show()
             }
-        } else {
-            // Fallback for development without OAuth keys
-            viewModel.handleSignInSuccess("user@gmail.com")
+        } catch (e: ApiException) {
+            val statusName = GoogleSignInStatusCodes.getStatusCodeString(e.statusCode)
+            android.util.Log.e(
+                "GoogleSignIn",
+                "Settings sign-in failed: resultCode=${result.resultCode}, statusCode=${e.statusCode} ($statusName)",
+                e,
+            )
+            viewModel.syncGoogleConnectionState()
+            val message = if (e.statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED) {
+                "Google sign-in was cancelled."
+            } else {
+                "Google sign-in failed: $statusName"
+            }
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            viewModel.syncGoogleConnectionState()
+            Toast.makeText(context, "Google sign-in failed. Please try again.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -235,7 +295,7 @@ fun SettingsScreen(
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         tint = TextPrimary,
                     )
@@ -431,19 +491,30 @@ fun SettingsScreen(
                     )
                     Column {
                         Text(
-                            text = "Current contact",
+                            text = "Saved contacts",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = TextPrimary,
                         )
-                        Text(
-                            text = state.emergencyContactName,
-                            fontSize = 14.sp,
-                            color = TextSecondary,
-                        )
+                        val contacts = state.emergencyContacts
+                        if (contacts.isEmpty()) {
+                            Text(
+                                text = "No emergency contacts saved",
+                                fontSize = 14.sp,
+                                color = TextSecondary,
+                            )
+                        } else {
+                            contacts.forEach { contact ->
+                                Text(
+                                    text = "${contact.name} · ${contact.phone}",
+                                    fontSize = 14.sp,
+                                    color = TextSecondary,
+                                )
+                            }
+                        }
                     }
                 }
-                TextButton(onClick = { /* TODO */ }) {
+                TextButton(onClick = { showEditEmergencyContact = true }) {
                     Text(text = "Edit", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Accent)
                 }
             }
@@ -566,6 +637,21 @@ fun SettingsScreen(
             }
         }
     }
+
+    // Emergency Contact Edit Dialog
+    if (showEditEmergencyContact) {
+        EmergencyContactEditDialog(
+            name = emergencyContactName,
+            phone = emergencyContactPhone,
+            onConfirm = { name, phone ->
+                emergencyContactName = name
+                emergencyContactPhone = phone
+                viewModel.updateEmergencyContact(name, phone)
+                showEditEmergencyContact = false
+            },
+            onDismiss = { showEditEmergencyContact = false },
+        )
+    }
 }
 
 @Composable
@@ -624,4 +710,48 @@ private fun CustomRadio(selected: Boolean) {
             )
         }
     }
+}
+
+@Composable
+private fun EmergencyContactEditDialog(
+    name: String,
+    phone: String,
+    onConfirm: (String, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var contactName by remember { mutableStateOf(name) }
+    var contactPhone by remember { mutableStateOf(phone) }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Edit Emergency Contact") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                androidx.compose.material3.TextField(
+                    value = contactName,
+                    onValueChange = { contactName = it },
+                    label = { Text("Contact Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                androidx.compose.material3.TextField(
+                    value = contactPhone,
+                    onValueChange = { contactPhone = it },
+                    label = { Text("Phone Number") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                onClick = { onConfirm(contactName, contactPhone) }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
