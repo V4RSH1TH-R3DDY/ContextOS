@@ -1,5 +1,10 @@
 package com.contextos.app.ui.dashboard
 
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutCubic
@@ -88,12 +93,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import java.time.LocalDate
+import java.time.ZoneId
 import com.contextos.app.ui.background.RippleGridBackground
 import com.contextos.app.ui.theme.Background
 import com.contextos.app.ui.theme.Border
@@ -117,12 +126,20 @@ import com.contextos.app.ui.theme.TextPrimary
 import com.contextos.app.ui.theme.TextSecondary
 import com.contextos.app.ui.theme.TextTertiary
 import com.contextos.app.ui.theme.UserBubble
+import com.contextos.app.BuildConfig
 import com.contextos.core.data.preferences.PreferencesManager
+import com.contextos.core.data.model.CalendarEventSummary
+import com.contextos.core.network.CalendarSyncWorker
+import com.contextos.core.network.GoogleAuthManager
+import com.contextos.core.network.CalendarApiClient
 import com.contextos.core.service.ContextOSServiceManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
+import com.google.android.gms.common.api.ApiException
 
 data class ChatMessage(
     val id: String,
@@ -141,7 +158,10 @@ data class FeatureItem(
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val preferencesManager: PreferencesManager,
+    private val googleAuthManager: GoogleAuthManager,
+    private val calendarApiClient: CalendarApiClient,
     private val openClawAgent: com.contextos.core.service.agent.openclaw.OpenClawAgent,
     private val skillRegistry: com.contextos.core.skills.SkillRegistry,
     private val userPreferenceRepository: com.contextos.core.data.repository.UserPreferenceRepository,
@@ -186,6 +206,56 @@ class DashboardViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyList(),
         )
+
+    val googleReauthRequired: StateFlow<Boolean> = preferencesManager.googleReauthRequired
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = false,
+        )
+
+    private val _debugEventsMessage = MutableStateFlow<String?>(null)
+    val debugEventsMessage: StateFlow<String?> = _debugEventsMessage
+
+    fun getSignInIntent(): Intent = googleAuthManager.signInClient.signInIntent
+
+    fun handleSignInSuccess(): Boolean {
+        val email = googleAuthManager.getConnectedAccountEmail()
+        viewModelScope.launch {
+            preferencesManager.setGoogleAccountEmail(email)
+            if (email != null) {
+                preferencesManager.setGoogleReauthRequired(false)
+                CalendarSyncWorker.schedule(appContext)
+            }
+        }
+        return email != null
+    }
+
+    fun fetchEventsForMay8() {
+        viewModelScope.launch {
+            val year = LocalDate.now().year
+            val date = LocalDate.of(year, 5, 8)
+            val events = calendarApiClient.getEventsForDay(date, ZoneId.systemDefault())
+            _debugEventsMessage.value = buildEventsMessage(date, events)
+        }
+    }
+
+    fun consumeDebugMessage() {
+        _debugEventsMessage.value = null
+    }
+
+    private fun buildEventsMessage(
+        date: LocalDate,
+        events: List<CalendarEventSummary>,
+    ): String {
+        if (events.isEmpty()) {
+            return "No events found for ${date.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}."
+        }
+        val titles = events.joinToString("; ") { event ->
+            event.title.ifBlank { "(untitled event)" }
+        }
+        return "${events.size} events on ${date.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}: $titles"
+    }
 
     fun sendMessage(text: String) {
         if (text.isBlank()) return
@@ -249,13 +319,14 @@ class DashboardViewModel @Inject constructor(
             |Your personality:
             |• Helpful, concise, and privacy-focused
             |• You speak in short, clear sentences
-            |• You never share user data externally — everything stays on-device
+            |• You are transparent when cloud intelligence or connected Google services are being used
             |• You're knowledgeable about the user's registered skills and can explain how they work
             |
             |Available skills: $skillNames
             |
             |Capabilities:
             |• You analyze the user's situation (location, calendar, battery, audio context) every 15 minutes
+            |• When connected, you can use Google Calendar, Gmail, and Drive with full access
             |• You can trigger skills like DND before meetings, warn about low battery, launch navigation, draft messages
             |• You learn from user patterns to make better recommendations over time
             |• Users can configure skill sensitivity and auto-approval in settings
@@ -286,6 +357,42 @@ fun DashboardScreen(
     var selectedFeature by remember { mutableStateOf<FeatureItem?>(null) }
     val listState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val needsGoogleReauth by viewModel.googleReauthRequired.collectAsState()
+    val debugMessage by viewModel.debugEventsMessage.collectAsState()
+
+    val reauthLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            task.getResult(ApiException::class.java)
+            if (!viewModel.handleSignInSuccess()) {
+                Toast.makeText(context, "Google needs updated permissions to reconnect.", Toast.LENGTH_LONG).show()
+            }
+        } catch (e: ApiException) {
+            val statusName = GoogleSignInStatusCodes.getStatusCodeString(e.statusCode)
+            android.util.Log.e(
+                "GoogleSignIn",
+                "Dashboard sign-in failed: resultCode=${result.resultCode}, statusCode=${e.statusCode} ($statusName)",
+                e,
+            )
+            val message = if (e.statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED) {
+                "Google sign-in was cancelled."
+            } else {
+                "Google sign-in failed: $statusName"
+            }
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            android.util.Log.e("GoogleSignIn", "Dashboard sign-in failed.", e)
+            Toast.makeText(context, "Google sign-in failed. Please try again.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(debugMessage) {
+        val message = debugMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        viewModel.consumeDebugMessage()
+    }
 
 
 
@@ -342,6 +449,28 @@ fun DashboardScreen(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
                         tint = TextSecondary,
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = needsGoogleReauth) {
+                GoogleReauthBanner(
+                    onReconnect = { reauthLauncher.launch(viewModel.getSignInIntent()) },
+                )
+            }
+
+            if (BuildConfig.DEBUG) {
+                TextButton(
+                    onClick = { viewModel.fetchEventsForMay8() },
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .align(Alignment.End),
+                ) {
+                    Text(
+                        text = "Debug: Load May 8 events",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextTertiary,
                     )
                 }
             }
@@ -491,6 +620,52 @@ fun DashboardScreen(
                 viewModel.updateFeature(selectedFeature!!.id, enabled, sensitivity)
             },
         )
+    }
+}
+
+@Composable
+private fun GoogleReauthBanner(
+    onReconnect: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .border(1.dp, BorderLight.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
+        color = SurfaceCard.copy(alpha = 0.92f),
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Reconnect Google",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "We need your consent to access Calendar, Gmail, and Drive.",
+                    fontSize = 12.sp,
+                    color = TextSecondary,
+                )
+            }
+            TextButton(onClick = onReconnect) {
+                Text(
+                    text = "Reconnect",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NeonOrange,
+                )
+            }
+        }
     }
 }
 

@@ -15,6 +15,7 @@ import com.contextos.app.ui.onboarding.GoogleSignInScreen
 import com.contextos.app.ui.onboarding.PermissionsScreen
 import com.contextos.app.ui.onboarding.WelcomeScreen
 import com.contextos.app.ui.settings.SettingsScreen
+import com.contextos.core.data.preferences.PreferencesManager
 
 @Composable
 fun ContextOSNavGraph(
@@ -54,8 +55,16 @@ fun ContextOSNavGraph(
                         popUpTo(Screen.Onboarding.Welcome.route) { inclusive = true }
                     }
                 },
-                onSaveContact = { name, phone, relationship ->
-                    onboardingViewModel.saveEmergencyContact(name, phone, relationship)
+                onSaveContacts = { contacts ->
+                    onboardingViewModel.saveEmergencyContacts(
+                        contacts.map {
+                            PreferencesManager.EmergencyContact(
+                                name = it.name,
+                                phone = it.phone,
+                                relationship = it.relationship,
+                            )
+                        }
+                    )
                 },
             )
         }

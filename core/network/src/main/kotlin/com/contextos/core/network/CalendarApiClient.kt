@@ -2,6 +2,7 @@ package com.contextos.core.network
 
 import android.util.Log
 import com.contextos.core.data.model.CalendarEventSummary
+import com.contextos.core.data.preferences.PreferencesManager
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.http.javanet.NetHttpTransport
@@ -11,6 +12,8 @@ import com.google.api.services.calendar.Calendar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +28,7 @@ import javax.inject.Singleton
 @Singleton
 class CalendarApiClient @Inject constructor(
     private val authManager: GoogleAuthManager,
+    private val preferencesManager: PreferencesManager,
 ) {
 
     // ─── Service builder ─────────────────────────────────────────────────────
@@ -49,6 +53,70 @@ class CalendarApiClient @Inject constructor(
      */
     suspend fun getUpcomingEvents(hoursAhead: Int = 8): List<CalendarEventSummary> =
         syncUpcomingEvents(hoursAhead = hoursAhead, syncToken = null).events
+
+    /**
+     * Returns calendar events on the given [date] in the device's local time zone.
+     */
+    suspend fun getEventsForDay(
+        date: LocalDate,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+    ): List<CalendarEventSummary> =
+        withContext(Dispatchers.IO) {
+            val service = buildService()
+                ?: return@withContext emptyList<CalendarEventSummary>().also {
+                    Log.w(TAG, "getEventsForDay: not signed in")
+                }
+
+            val startMs = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+            val endMs = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+
+            try {
+                retryWithBackoff(tag = TAG) {
+                    val result = service.events().list("primary")
+                        .setSingleEvents(true)
+                        .setTimeMin(DateTime(startMs))
+                        .setTimeMax(DateTime(endMs))
+                        .setOrderBy("startTime")
+                        .setFields("items(id,summary,location,description,start,end,attendees,status)")
+                        .execute()
+
+                    (result.items ?: emptyList()).mapNotNull { event ->
+                        if (event.status == "cancelled") return@mapNotNull null
+
+                        val description = event.description.orEmpty()
+                        val location = event.location.orEmpty()
+                        val meetingLink = extractMeetingLink("$description $location")
+                        val isVirtual = meetingLink != null
+                            || VIRTUAL_KEYWORDS.any { kw ->
+                                location.contains(kw, ignoreCase = true)
+                            }
+
+                        CalendarEventSummary(
+                            eventId = event.id.orEmpty(),
+                            title = event.summary.orEmpty(),
+                            location = event.location,
+                            startTime = event.start?.dateTime?.value
+                                ?: event.start?.date?.value ?: startMs,
+                            endTime = event.end?.dateTime?.value
+                                ?: event.end?.date?.value ?: endMs,
+                            attendees = event.attendees?.mapNotNull { it.email } ?: emptyList(),
+                            meetingLink = meetingLink,
+                            isVirtual = isVirtual,
+                        )
+                    }
+                }
+            } catch (e: UserRecoverableAuthIOException) {
+                Log.w(TAG, "User needs to re-authorize Calendar access", e)
+                preferencesManager.setGoogleReauthRequired(true)
+                emptyList()
+            } catch (e: GoogleJsonResponseException) {
+                Log.e(TAG, "Calendar API error", e)
+                emptyList()
+            } catch (e: IOException) {
+                Log.e(TAG, "Failed to fetch day events after retries", e)
+                emptyList()
+            }
+        }
 
     /**
      * Syncs upcoming events and returns the next incremental sync token when Google provides it.
@@ -122,6 +190,7 @@ class CalendarApiClient @Inject constructor(
                 }
             } catch (e: UserRecoverableAuthIOException) {
                 Log.w(TAG, "User needs to re-authorize Calendar access", e)
+                preferencesManager.setGoogleReauthRequired(true)
                 CalendarSyncResult.empty()
             } catch (e: GoogleJsonResponseException) {
                 if (e.statusCode == HTTP_GONE) {

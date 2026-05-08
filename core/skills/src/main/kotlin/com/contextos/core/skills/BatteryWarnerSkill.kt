@@ -1,21 +1,18 @@
 package com.contextos.core.skills
 
 import android.content.Context
-import android.content.SharedPreferences
+import com.contextos.core.data.preferences.PreferencesManager
 import com.contextos.core.data.db.dao.UserPreferenceDao
 import com.contextos.core.data.model.ActionOutcome
 import com.contextos.core.data.model.SituationModel
 import com.contextos.core.data.repository.ActionLogRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private const val PREFS_NAME = "contextos_preferences"
-private const val KEY_EMERGENCY_CONTACT_NAME = "emergency_contact_name"
-private const val KEY_EMERGENCY_CONTACT_PHONE = "emergency_contact_phone"
 
 /**
  * Battery Warner skill — warns an emergency contact when battery is critically low
@@ -34,6 +31,7 @@ private const val KEY_EMERGENCY_CONTACT_PHONE = "emergency_contact_phone"
 @Singleton
 class BatteryWarnerSkill @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val preferencesManager: PreferencesManager,
     private val actionLogRepository: ActionLogRepository,
     private val userPreferenceDao: UserPreferenceDao,
 ) : Skill {
@@ -41,10 +39,6 @@ class BatteryWarnerSkill @Inject constructor(
     override val id: String = "battery_warner"
     override val name: String = "Battery Warner"
     override val description: String = "Warns your emergency contact when battery is low before a long meeting."
-
-    private val prefs: SharedPreferences by lazy {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    }
 
     override fun shouldTrigger(model: SituationModel): Boolean {
         if (model.batteryLevel >= BATTERY_THRESHOLD) return false
@@ -67,8 +61,9 @@ class BatteryWarnerSkill @Inject constructor(
     }
 
     override suspend fun execute(model: SituationModel): SkillResult = withContext(Dispatchers.Default) {
-        val contactName = prefs.getString(KEY_EMERGENCY_CONTACT_NAME, null)
-        val contactPhone = prefs.getString(KEY_EMERGENCY_CONTACT_PHONE, null)
+        val primaryContact = preferencesManager.emergencyContacts.first().firstOrNull()
+        val contactName = primaryContact?.name
+        val contactPhone = primaryContact?.phone
 
         if (contactName.isNullOrEmpty() || contactPhone.isNullOrEmpty()) {
             return@withContext SkillResult.Failure(

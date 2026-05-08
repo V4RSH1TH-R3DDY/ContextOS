@@ -5,6 +5,7 @@ import com.contextos.core.data.db.dao.UserPreferenceDao
 import com.contextos.core.data.model.CalendarEventSummary
 import com.contextos.core.data.model.SituationModel
 import com.contextos.core.data.repository.ActionLogRepository
+import com.contextos.core.data.preferences.PreferencesManager
 import io.mockk.mockk
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,12 +17,13 @@ class BatteryWarnerSkillTest {
 
     private lateinit var skill: BatteryWarnerSkill
     private val mockContext = mockk<Context>()
+    private val mockPreferencesManager = mockk<PreferencesManager>()
     private val mockActionLogRepository = mockk<ActionLogRepository>()
     private val mockUserPreferenceDao = mockk<UserPreferenceDao>()
 
     @Before
     fun setup() {
-        skill = BatteryWarnerSkill(mockContext, mockActionLogRepository, mockUserPreferenceDao)
+        skill = BatteryWarnerSkill(mockContext, mockPreferencesManager, mockActionLogRepository, mockUserPreferenceDao)
     }
 
     @Test

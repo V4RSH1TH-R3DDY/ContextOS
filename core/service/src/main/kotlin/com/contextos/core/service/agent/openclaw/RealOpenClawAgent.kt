@@ -17,14 +17,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Production implementation of [OpenClawAgent] backed by the Gemini REST API.
+ * Production implementation of [OpenClawAgent] backed by Gemini or Groq REST API.
  *
- * Uses [OpenClawPromptBuilder] to construct structured prompts and
- * [GeminiApiClient] to send them to the configured Gemini models.
+ * Auto-detects provider based on API key format:
+ *   - Groq key (starts with "gsk_") → uses GroqApiClient
+ *   - Gemini key → uses GeminiApiClient
  *
- * Model selection (from `env.sh`):
- *   - Situation analysis → `OPENCLAW_REASONING_MODEL` (default: gemini-2.0-flash)
- *   - Message drafting   → `OPENCLAW_DRAFTING_MODEL`  (default: gemini-2.0-flash-lite)
+ * Uses [OpenClawPromptBuilder] to construct structured prompts.
+ *
+ * Model selection (from `local.properties`):
+ *   - Groq: mixtral-8x7b-32768 (default)
+ *   - Gemini: gemini-2.0-flash (default)
  *
  * If the feature flag for a given capability is disabled, the agent falls back
  * to deterministic rule-based logic identical to [MockOpenClawAgent], so
@@ -34,6 +37,8 @@ import javax.inject.Singleton
 class RealOpenClawAgent @Inject constructor(
     private val promptBuilder: OpenClawPromptBuilder,
     private val geminiClient: GeminiApiClient,
+    private val groqClient: GroqApiClient,
+    private val googleServicesContextProvider: GoogleServicesContextProvider,
 ) : OpenClawAgent {
 
     private val json = Json {
@@ -58,11 +63,11 @@ class RealOpenClawAgent @Inject constructor(
 
         return try {
             val prompt = promptBuilder.buildSituationPrompt(model)
-            val rawResponse = geminiClient.generate(reasoningModel, prompt)
-            Log.d(TAG, "Gemini reasoning response: ${rawResponse.take(200)}")
+            val rawResponse = generateSingleTurn(reasoningModel, prompt, temperature = 0.3f)
+            Log.d(TAG, "Reasoning response: ${rawResponse.take(200)}")
             parseSituationAnalysis(rawResponse)
         } catch (e: Exception) {
-            Log.w(TAG, "Gemini reasoning failed — falling back to rules", e)
+            Log.w(TAG, "LLM reasoning failed — falling back to rules", e)
             ruleBasedAnalysis(model)
         }
     }
@@ -84,21 +89,21 @@ class RealOpenClawAgent @Inject constructor(
 
         return try {
             val prompt = promptBuilder.buildDraftingPrompt(context)
-            val rawResponse = geminiClient.generate(draftingModel, prompt)
+            val rawResponse = generateSingleTurn(draftingModel, prompt, temperature = 0.7f)
             val draft = rawResponse
                 .trim()
                 .removeSurrounding("\"")  // LLM sometimes wraps in quotes
                 .trim()
 
             if (draft.isBlank()) {
-                Log.w(TAG, "Gemini returned empty draft — using fallback")
+                Log.w(TAG, "LLM returned empty draft — using fallback")
                 ruleBasedDraft(context)
             } else {
-                Log.d(TAG, "Gemini draft: $draft")
+                Log.d(TAG, "LLM draft: $draft")
                 draft
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Gemini drafting failed — falling back to rules", e)
+            Log.w(TAG, "LLM drafting failed — falling back to rules", e)
             ruleBasedDraft(context)
         }
     }
@@ -162,6 +167,29 @@ class RealOpenClawAgent @Inject constructor(
 
         // Last resort — return as-is, let the parser throw a clear error
         return raw
+    }
+
+    private suspend fun generateSingleTurn(
+        model: String,
+        prompt: String,
+        temperature: Float,
+    ): String {
+        return when (com.contextos.core.service.BuildConfig.OPENCLAW_API_PROVIDER) {
+            "groq" -> groqClient.generateMultiTurn(
+                model = model,
+                messages = listOf(GroqMessage(role = "user", content = prompt)),
+                temperature = temperature,
+                maxTokens = 2048,
+            )
+            else -> geminiClient.generateMultiTurn(
+                model = model,
+                contents = listOf(
+                    GeminiContent(parts = listOf(GeminiPart(text = prompt)), role = "user")
+                ),
+                temperature = temperature,
+                maxOutputTokens = 2048,
+            )
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -248,42 +276,84 @@ class RealOpenClawAgent @Inject constructor(
     override suspend fun chat(history: List<ChatTurn>): String {
         val chatModel = com.contextos.core.service.BuildConfig.OPENCLAW_CHAT_MODEL.takeIf { it.isNotEmpty() }
             ?: DEFAULT_CHAT_MODEL
+        val provider = com.contextos.core.service.BuildConfig.OPENCLAW_API_PROVIDER
+        val augmentedHistory = augmentHistoryWithGoogleContext(history)
 
         return try {
-            // Build the Gemini contents array from chat history.
-            // The first system-role turn becomes the first "user" turn with the system prompt
-            // (Gemini API uses "user"/"model" roles, not "system").
-            val contents = mutableListOf<GeminiContent>()
-
-            for (turn in history) {
-                val geminiRole = when (turn.role) {
-                    "system" -> "user"    // Gemini treats system as user context
-                    "assistant", "model" -> "model"
-                    else -> "user"
-                }
-                contents.add(
-                    GeminiContent(
-                        parts = listOf(GeminiPart(text = turn.content)),
-                        role = geminiRole,
+            when (provider) {
+                "groq" -> {
+                    // Convert ChatTurn to GroqMessage format (OpenAI-compatible)
+                    val messages = augmentedHistory.map { turn ->
+                        GroqMessage(
+                            role = when (turn.role) {
+                                "assistant", "model" -> "assistant"
+                                "system" -> "system"
+                                else -> "user"
+                            },
+                            content = turn.content
+                        )
+                    }
+                    val response = groqClient.generateMultiTurn(
+                        model = chatModel,
+                        messages = messages,
+                        temperature = 0.7f,
+                        maxTokens = 2048,
                     )
-                )
+                    Log.d(TAG, "Groq chat response: ${response.take(200)}")
+                    response
+                }
+                else -> {
+                    // Gemini format (default)
+                    val contents = mutableListOf<GeminiContent>()
+                    for (turn in augmentedHistory) {
+                        val geminiRole = when (turn.role) {
+                            "system" -> "user"
+                            "assistant", "model" -> "model"
+                            else -> "user"
+                        }
+                        contents.add(
+                            GeminiContent(
+                                parts = listOf(GeminiPart(text = turn.content)),
+                                role = geminiRole,
+                            )
+                        )
+                    }
+                    val merged = mergeConsecutiveTurns(contents)
+                    val response = geminiClient.generateMultiTurn(
+                        model = chatModel,
+                        contents = merged,
+                        temperature = 0.7f,
+                        maxOutputTokens = 2048,
+                    )
+                    Log.d(TAG, "Gemini chat response: ${response.take(200)}")
+                    response
+                }
             }
-
-            // Gemini requires alternating user/model turns. If we have consecutive same-role turns
-            // (e.g. system + user), merge them.
-            val merged = mergeConsecutiveTurns(contents)
-
-            val response = geminiClient.generateMultiTurn(
-                model = chatModel,
-                contents = merged,
-                temperature = 0.7f,
-                maxOutputTokens = 2048,
-            )
-            Log.d(TAG, "Chat response: ${response.take(200)}")
-            response
         } catch (e: Exception) {
             Log.w(TAG, "Chat generation failed", e)
             "I'm having trouble connecting to my intelligence backend right now. Please try again in a moment."
+        }
+    }
+
+    private suspend fun augmentHistoryWithGoogleContext(history: List<ChatTurn>): List<ChatTurn> {
+        val googleContext = googleServicesContextProvider.buildForChat(history)
+        if (googleContext.isBlank()) return history
+
+        val contextTurn = ChatTurn(
+            role = "system",
+            content = """
+                |Google services context available to ContextOS for this response:
+                |$googleContext
+                |
+                |Use this context only when it is relevant to the user's latest message. You have full access to manage and modify Gmail, Drive, and Calendar as requested.
+            """.trimMargin(),
+        )
+
+        val firstUserIndex = history.indexOfFirst { it.role == "user" }
+        return if (firstUserIndex == -1) {
+            history + contextTurn
+        } else {
+            history.take(firstUserIndex) + contextTurn + history.drop(firstUserIndex)
         }
     }
 

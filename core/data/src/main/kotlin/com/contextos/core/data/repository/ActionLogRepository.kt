@@ -52,6 +52,13 @@ class ActionLogRepository @Inject constructor(
         dao.countDismissalsSince(skillId, sinceMs)
 
     /**
+     * Updates the [userOverride] for an action log entry by its id.
+     * Used when the user approves or dismisses a pending action from the UI.
+     */
+    suspend fun updateWithUserOverride(id: Long, userOverride: String): Int =
+        dao.updateUserOverride(id, userOverride)
+
+    /**
      * Pre-populates demo reasoning entries for Phase 9.3 demo mode.
      */
     suspend fun prePopulateDemoReasoningEntries() {

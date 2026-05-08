@@ -104,7 +104,20 @@ class GeminiApiClient @Inject constructor() {
             if (responseCode != HttpURLConnection.HTTP_OK) {
                 val errorBody = connection.errorStream?.bufferedReader()?.readText() ?: "no body"
                 Log.e(TAG, "Gemini API error $responseCode: $errorBody")
-                throw GeminiApiException("Gemini API returned HTTP $responseCode: $errorBody")
+                val apiError = runCatching { json.decodeFromString<GeminiErrorEnvelope>(errorBody).error }.getOrNull()
+                val detailedMessage = when {
+                    apiError?.status == "RESOURCE_EXHAUSTED" -> {
+                        val quotaHint = if (errorBody.contains("limit: 0")) {
+                            " Gemini project/key has no available quota. Enable billing or use a project with Gemini quota."
+                        } else {
+                            ""
+                        }
+                        "Gemini API quota exceeded (HTTP $responseCode).${quotaHint}"
+                    }
+                    apiError?.message != null -> "Gemini API returned HTTP $responseCode: ${apiError.message}"
+                    else -> "Gemini API returned HTTP $responseCode: $errorBody"
+                }
+                throw GeminiApiException(detailedMessage)
             }
 
             val responseBody = connection.inputStream.bufferedReader().readText()
@@ -167,6 +180,18 @@ data class GeminiResponse(
 @Serializable
 data class GeminiCandidate(
     val content: GeminiContent? = null,
+)
+
+@Serializable
+data class GeminiErrorEnvelope(
+    val error: GeminiErrorBody,
+)
+
+@Serializable
+data class GeminiErrorBody(
+    val code: Int? = null,
+    val message: String? = null,
+    val status: String? = null,
 )
 
 class GeminiApiException(message: String, cause: Throwable? = null) : Exception(message, cause)

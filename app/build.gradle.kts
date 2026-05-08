@@ -117,6 +117,10 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.hilt.navigation.compose)
+    implementation(libs.hilt.work)
+
+    // WorkManager
+    implementation(libs.workmanager.ktx)
 
     // Internal modules
     implementation(project(":core:service"))

@@ -21,7 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.contextos.app.ui.theme.Background
 import com.contextos.app.ui.theme.Accent
 import com.contextos.app.ui.theme.DividerLine
@@ -54,6 +55,7 @@ import com.contextos.app.ui.theme.TextTertiary
 fun ActionDetailScreen(
     logId: Long,
     onBack: () -> Unit,
+    viewModel: ActionDetailViewModel = hiltViewModel(),
 ) {
     var expanded by remember { mutableStateOf(false) }
     val isPending = logId == 1L
@@ -76,7 +78,7 @@ fun ActionDetailScreen(
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         tint = TextPrimary,
                     )
@@ -244,7 +246,10 @@ fun ActionDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     androidx.compose.material3.Button(
-                        onClick = { /* TODO */ },
+                        onClick = {
+                            viewModel.approveAction(logId)
+                            onBack()
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .height(56.dp),
@@ -257,7 +262,10 @@ fun ActionDetailScreen(
                         Text(text = "Approve", fontSize = 16.sp, fontWeight = FontWeight.Medium)
                     }
                     OutlinedButton(
-                        onClick = { /* TODO */ },
+                        onClick = {
+                            viewModel.dismissAction(logId)
+                            onBack()
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .height(56.dp),

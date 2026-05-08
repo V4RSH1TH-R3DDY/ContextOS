@@ -1,16 +1,18 @@
 package com.contextos.app.ui.onboarding
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
+import com.google.android.gms.common.api.ApiException
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -22,8 +24,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,6 +49,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -57,6 +62,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -303,24 +309,35 @@ fun GoogleSignInScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         android.util.Log.d("GoogleSignIn", "Result Code: ${result.resultCode}")
-        if (result.resultCode == Activity.RESULT_OK) {
-            val fallbackEmail = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            try {
-                val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
-                android.util.Log.d("GoogleSignIn", "Sign in successful: ${account?.email}")
-                viewModel.handleSignInSuccess(fallbackEmail)
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            android.util.Log.d("GoogleSignIn", "Sign in successful: ${account?.email}")
+            if (viewModel.handleSignInSuccess()) {
                 onSignIn()
-            } catch (e: Exception) {
-                android.util.Log.e("GoogleSignIn", "Sign-in failed. Proceeding with fallback email.", e)
-                viewModel.handleSignInSuccess(fallbackEmail)
-                onSignIn()
+            } else {
+                Toast.makeText(context, "Google needs Calendar, Gmail, and Drive access to connect.", Toast.LENGTH_LONG).show()
             }
-        } else {
-            android.util.Log.w("GoogleSignIn", "Sign-in cancelled or failed before result. Intent data: ${result.data}")
-            // Fallback for development without OAuth keys
-            viewModel.handleSignInSuccess("user@gmail.com")
-            onSignIn()
+        } catch (e: ApiException) {
+            val statusName = GoogleSignInStatusCodes.getStatusCodeString(e.statusCode)
+            android.util.Log.e(
+                "GoogleSignIn",
+                "Sign-in failed: resultCode=${result.resultCode}, statusCode=${e.statusCode} ($statusName)",
+                e,
+            )
+            if (viewModel.handleSignInSuccess()) {
+                onSignIn()
+            } else {
+                val message = if (e.statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED) {
+                    "Google sign-in was cancelled."
+                } else {
+                    "Google sign-in failed: $statusName"
+                }
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("GoogleSignIn", "Sign-in failed.", e)
+            Toast.makeText(context, "Google sign-in failed. Please try again.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -351,7 +368,7 @@ fun GoogleSignInScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Syncs Calendar, Gmail, and Drive for proactive assistance. Read-only access, revokable.",
+                text = "Syncs Calendar, Gmail, and Drive for proactive assistance. Full access, revokable.",
                 fontSize = 14.sp,
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
@@ -363,9 +380,9 @@ fun GoogleSignInScreen(
 
             Column(modifier = Modifier.padding(horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 listOf(
-                    "Calendar — smart meeting reminders & DND",
-                    "Gmail — draft replies when unreachable",
-                    "Drive — surface docs before meetings",
+                    "Calendar — manage meetings & DND",
+                    "Gmail — read, label, and draft replies",
+                    "Drive — read and organize docs before meetings",
                 ).forEach { feature ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -402,22 +419,31 @@ fun GoogleSignInScreen(
 
 private val RELATIONSHIP_OPTIONS = listOf("Family", "Friend", "Work", "Doctor")
 
+data class EditableEmergencyContact(
+    val name: String = "",
+    val phone: String = "",
+    val relationship: String = "",
+)
+
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun EmergencyContactScreen(
     onNext: () -> Unit,
-    onSaveContact: (name: String, phone: String, relationship: String) -> Unit = { _, _, _ -> },
+    onSaveContacts: (contacts: List<EditableEmergencyContact>) -> Unit = { _ -> },
 ) {
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var relationship by remember { mutableStateOf("") }
+    val contacts = remember { mutableStateListOf(EditableEmergencyContact()) }
 
-    val isValid = name.trim().isNotEmpty() && phone.trim().isNotEmpty() && relationship.isNotEmpty()
+    val isValid = contacts.isNotEmpty() && contacts.all { contact ->
+        contact.name.trim().isNotEmpty() &&
+            contact.phone.trim().isNotEmpty() &&
+            contact.relationship.isNotEmpty()
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = Background) {
         Column(
             modifier = Modifier.fillMaxSize()
                 .padding(horizontal = 32.dp)
-                .padding(top = 32.dp, bottom = 32.dp)
+                .padding(top = 56.dp, bottom = 32.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
             Text(text = "Emergency Contact", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
@@ -434,93 +460,151 @@ fun EmergencyContactScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column {
-                    Text(
-                        text = "Full name",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextSecondary,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    BasicTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        modifier = Modifier.fillMaxWidth().height(56.dp)
-                            .background(SurfaceInput, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = TextPrimary),
-                        singleLine = true,
-                        cursorBrush = SolidColor(Accent),
-                        decorationBox = { innerTextField ->
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-                                if (name.isEmpty()) Text(text = "John Doe", fontSize = 16.sp, color = TextTertiary)
-                                innerTextField()
+                contacts.forEachIndexed { index, contact ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SurfaceCard, RoundedCornerShape(20.dp))
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column {
+                                Text(
+                                    text = if (index == 0) "Primary contact" else "Contact ${index + 1}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextPrimary,
+                                )
+                                Text(
+                                    text = if (index == 0) "ContextOS uses this first if help is needed."
+                                    else "Backup emergency contact.",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary,
+                                )
                             }
-                        },
-                    )
-                }
-
-                Column {
-                    Text(
-                        text = "Phone number",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextSecondary,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    BasicTextField(
-                        value = phone,
-                        onValueChange = { phone = it },
-                        modifier = Modifier.fillMaxWidth().height(56.dp)
-                            .background(SurfaceInput, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = TextPrimary),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        cursorBrush = SolidColor(Accent),
-                        decorationBox = { innerTextField ->
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-                                if (phone.isEmpty()) Text(text = "+1 555 0123", fontSize = 16.sp, color = TextTertiary)
-                                innerTextField()
+                            if (contacts.size > 1) {
+                                TextButton(onClick = { contacts.removeAt(index) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.DeleteOutline,
+                                        contentDescription = "Remove contact",
+                                        tint = Accent,
+                                    )
+                                }
                             }
-                        },
-                    )
-                }
+                        }
 
-                Column {
-                    Text(
-                        text = "Relationship",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextSecondary,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        RELATIONSHIP_OPTIONS.forEach { rel ->
-                            val selected = relationship == rel
-                            FilterChip(
-                                selected = selected,
-                                onClick = { relationship = rel },
-                                label = { Text(text = rel, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = if (selected) Accent else SurfaceInput,
-                                    labelColor = if (selected) Color.White else TextSecondary,
-                                    selectedContainerColor = Accent,
-                                    selectedLabelColor = Color.White,
-                                ),
-                                shape = RoundedCornerShape(12.dp),
+                        Column {
+                            Text(
+                                text = "Full name",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextSecondary,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(bottom = 8.dp),
                             )
+                            BasicTextField(
+                                value = contact.name,
+                                onValueChange = { value -> contacts[index] = contact.copy(name = value) },
+                                modifier = Modifier.fillMaxWidth().height(56.dp)
+                                    .background(SurfaceInput, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = TextPrimary),
+                                singleLine = true,
+                                cursorBrush = SolidColor(Accent),
+                                decorationBox = { innerTextField ->
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                                        if (contact.name.isEmpty()) {
+                                            Text(text = "John Doe", fontSize = 16.sp, color = TextTertiary)
+                                        }
+                                        innerTextField()
+                                    }
+                                },
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "Phone number",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextSecondary,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                            BasicTextField(
+                                value = contact.phone,
+                                onValueChange = { value -> contacts[index] = contact.copy(phone = value) },
+                                modifier = Modifier.fillMaxWidth().height(56.dp)
+                                    .background(SurfaceInput, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = TextPrimary),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                cursorBrush = SolidColor(Accent),
+                                decorationBox = { innerTextField ->
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                                        if (contact.phone.isEmpty()) {
+                                            Text(text = "+1 555 0123", fontSize = 16.sp, color = TextTertiary)
+                                        }
+                                        innerTextField()
+                                    }
+                                },
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "Relationship",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextSecondary,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                RELATIONSHIP_OPTIONS.forEach { rel ->
+                                    val selected = contact.relationship == rel
+                                    FilterChip(
+                                        selected = selected,
+                                        onClick = { contacts[index] = contact.copy(relationship = rel) },
+                                        label = { Text(text = rel, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            containerColor = if (selected) Accent else SurfaceInput,
+                                            labelColor = if (selected) Color.White else TextSecondary,
+                                            selectedContainerColor = Accent,
+                                            selectedLabelColor = Color.White,
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = { contacts.add(EditableEmergencyContact()) },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Text(text = "Add another contact", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Accent)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
                 onClick = {
-                    onSaveContact(name, phone, relationship)
+                    onSaveContacts(contacts.toList())
                     onNext()
                 },
                 enabled = isValid,
