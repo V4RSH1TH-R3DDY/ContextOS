@@ -24,6 +24,9 @@
     <string name="permission_rationale_calendar">ContextOS reads your calendar to help plan your day and avoid scheduling conflicts.</string>
     <string name="permission_rationale_sms">ContextOS reads SMS messages to give you a unified view of your conversations and follow-ups.</string>
 
+    <!-- Google Sign-In -->
+    <string name="default_web_client_id">924159966156-f32343arpg2ifsntlu4s3albotdive7e.apps.googleusercontent.com</string>
+
     <!-- Generic UI -->
     <string name="label_ok">OK</string>
     <string name="label_cancel">Cancel</string>

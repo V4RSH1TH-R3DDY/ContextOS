@@ -353,12 +353,15 @@ fun DashboardScreen(
     val features by viewModel.features.collectAsState()
     val input = remember { mutableStateOf("") }
     var sidebarOpen by remember { mutableStateOf(false) }
-    var showPermissions by remember { mutableStateOf(false) }
     var selectedFeature by remember { mutableStateOf<FeatureItem?>(null) }
     val listState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val needsGoogleReauth by viewModel.googleReauthRequired.collectAsState()
     val debugMessage by viewModel.debugEventsMessage.collectAsState()
+
+    LaunchedEffect(Unit) {
+        ContextOSServiceManager.startService(context)
+    }
 
     val reauthLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -599,17 +602,6 @@ fun DashboardScreen(
                 onClose = { sidebarOpen = false },
             )
         }
-    }
-
-    if (showPermissions) {
-        PermissionsModal(
-            isOpen = true,
-            onClose = { showPermissions = false },
-            onGrant = {
-                viewModel.markOnboardingComplete()
-                ContextOSServiceManager.startService(context)
-            },
-        )
     }
 
     if (selectedFeature != null) {

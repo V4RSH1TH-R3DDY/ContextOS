@@ -105,3 +105,5 @@ libs/*.so
 .env.*
 
 env.sh
+
+.vscode/

@@ -100,6 +100,18 @@ class OpenClawPromptBuilder @Inject constructor() {
         sb.appendLine("- location_intelligence: updates notification mode per location")
         sb.appendLine()
 
+        // ── Tool Guidance ────────────────────────────────────────────────
+        sb.appendLine("## Available Tools")
+        sb.appendLine("You may use the following tools to gather additional context:")
+        sb.appendLine("- calendar_list_events: Read your upcoming calendar events")
+        sb.appendLine("- gmail_search: Search your Gmail inbox")
+        sb.appendLine("- gmail_get_message: Read a specific email")
+        sb.appendLine("- drive_search_files: Search Google Drive files")
+        sb.appendLine("- drive_list_recent_files: List recent Drive files")
+        sb.appendLine("Use tools when you need more context. When you have enough information,")
+        sb.appendLine("return your analysis as JSON.")
+        sb.appendLine()
+
         // ── Output Format ────────────────────────────────────────────────
         sb.appendLine("## Instructions")
         sb.appendLine("Return ONLY valid JSON matching this schema:")
